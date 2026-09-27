@@ -249,6 +249,12 @@ function main() {
   const maxDate = audits.reduce((m, a) => (a.date > m ? a.date : m), audits[0] ? audits[0].date : '');
   const NOW = new Date(maxDate + 'T23:59:59Z');
   console.log(`  ${au.rows.length} raw rows -> ${audits.length} deduped audits, data as of ${maxDate}`);
+  // Every downstream file (Audit Response, CAPA Tasks, SKU-wise, Zone Verify) carries
+  // its own auditId pointing back to one row in Audits.csv. When a POD resubmits an
+  // audit for the same store+day, the superseded submission's auditId is dropped here
+  // but its findings/CAPA tasks/SKU checks live on in those other files unless we also
+  // gate them on this same kept-id set — otherwise they silently double-count.
+  const keptAuditIds = new Set(audits.map((a) => a.id));
 
   // CAPA Tasks has no `brand` column of its own, only a messy free-text `category`
   // column that (like the original Audit Response bug) can't be told apart between
@@ -268,12 +274,14 @@ function main() {
   console.log('Loading CAPA Tasks...');
   const ct = loadCSV(FILES.capa);
   const capa = [];
+  let capaSkippedDupe = 0;
   for (const r of ct.rows) {
+    const capaAuditId = get(r, ct.idx, 'auditId');
+    if (!keptAuditIds.has(capaAuditId)) { capaSkippedDupe++; continue; }
     const storeId = get(r, ct.idx, 'storeId');
     const city = get(r, ct.idx, 'storeLocation') || (storeMeta.get(storeId) || {}).city || 'Unknown';
     const status = get(r, ct.idx, 'status') || 'Open';
     const createdAt = get(r, ct.idx, 'createdAt');
-    const capaAuditId = get(r, ct.idx, 'auditId');
     const capaQuestionNo = get(r, ct.idx, 'questionNo');
     const category = capaCategoryByAuditQ.get(capaAuditId + '|' + capaQuestionNo) || null;
     const dueAt = get(r, ct.idx, 'dueAt');
@@ -316,7 +324,7 @@ function main() {
   const capaStatusCounts = { Open: 0, 'In Progress': 0, Closed: 0 };
   const capaSlaCounts = { closed_on_time: 0, closed_late: 0, open_on_track: 0, open_overdue: 0, in_progress_on_track: 0, in_progress_overdue: 0 };
   for (const c of capa) { capaStatusCounts[c.status] = (capaStatusCounts[c.status] || 0) + 1; capaSlaCounts[c.slaState]++; }
-  console.log(`  ${capa.length} CAPA tasks:`, capaStatusCounts, capaSlaCounts);
+  console.log(`  ${capa.length} CAPA tasks (${capaSkippedDupe} skipped, tied to a superseded resubmission):`, capaStatusCounts, capaSlaCounts);
 
   console.log('Loading Audit Responses (category/parameter compliance)...');
   const ar = loadCSV(FILES.responses);
@@ -332,7 +340,9 @@ function main() {
     if (!brandParamStats.has(key)) brandParamStats.set(key, { compliant: 0, nonCompliant: 0, partial: 0, na: 0, byCity: new Map(), byPod: new Map() });
     return brandParamStats.get(key);
   }
+  let arSkippedDupe = 0;
   for (const r of ar.rows) {
+    if (!keptAuditIds.has(get(r, ar.idx, 'auditId'))) { arSkippedDupe++; continue; }
     const param = get(r, ar.idx, 'parameter');
     if (!param || !PARAM_META[param]) continue; // skip blank/unmapped rows
     const response = get(r, ar.idx, 'response');
@@ -407,7 +417,7 @@ function main() {
       }
     }
   }
-  console.log(`  ${ar.rows.length} response rows across ${paramStats.size} mapped parameters`);
+  console.log(`  ${ar.rows.length - arSkippedDupe} response rows across ${paramStats.size} mapped parameters (${arSkippedDupe} skipped, tied to a superseded resubmission)`);
 
   // ---------- Cadence: daily / weekly / monthly distinct PODs audited ----------
   const dailyMap = new Map(); // date -> {pods:Set, audits}
@@ -550,7 +560,9 @@ function main() {
   const skuAgg = { total: 0, expired: 0, fefoViolations: 0, puffingViolations: 0, locationDeviations: 0 };
   const skuByCity = new Map(), skuByPod = new Map();
   const skuExpiredList = []; // drilldown: actual expired SKU findings with names
+  let skuSkippedDupe = 0;
   for (const r of skuCsv.rows) {
+    if (!keptAuditIds.has(get(r, skuCsv.idx, 'auditId'))) { skuSkippedDupe++; continue; }
     const storeId = get(r, skuCsv.idx, 'storeId');
     const city = get(r, skuCsv.idx, 'storeLocation') || (storeMeta.get(storeId) || {}).city || 'Unknown';
     const storeName = get(r, skuCsv.idx, 'storeName') || (storeMeta.get(storeId) || {}).storeName || city;
@@ -588,7 +600,7 @@ function main() {
       });
     }
   }
-  console.log(`  ${skuAgg.total} SKU checks: ${skuAgg.expired} expired, ${skuAgg.fefoViolations} FEFO violations, ${skuAgg.puffingViolations} puffing violations, ${skuAgg.locationDeviations} location deviations`);
+  console.log(`  ${skuAgg.total} SKU checks (${skuSkippedDupe} skipped, tied to a superseded resubmission): ${skuAgg.expired} expired, ${skuAgg.fefoViolations} FEFO violations, ${skuAgg.puffingViolations} puffing violations, ${skuAgg.locationDeviations} location deviations`);
 
   // ---------- Zone verify check: SKU found in wrong storage zone ----------
   console.log('Loading Zone verify checks...');
@@ -596,8 +608,10 @@ function main() {
   const auditIndex = new Map(audits.map((a) => [a.id, a])); // auditId -> canonical audit (city/store)
   const zvAgg = { total: 0, wrongLocation: 0 };
   const zvByCity = new Map();
+  let zvSkippedDupe = 0;
   for (const r of zv.rows) {
     const auditId = get(r, zv.idx, 'auditId');
+    if (!keptAuditIds.has(auditId)) { zvSkippedDupe++; continue; }
     const a = auditIndex.get(auditId);
     const city = a ? a.city : 'Unknown';
     zvAgg.total++;
@@ -608,7 +622,7 @@ function main() {
       zvByCity.get(city).wrongLocation++;
     }
   }
-  console.log(`  ${zvAgg.total} zone-verify checks: ${zvAgg.wrongLocation} wrong-location findings`);
+  console.log(`  ${zvAgg.total} zone-verify checks (${zvSkippedDupe} skipped, tied to a superseded resubmission): ${zvAgg.wrongLocation} wrong-location findings`);
 
   // ---------- Expiry Check Items: network-wide only (export has no store/audit reference) ----------
   console.log('Loading Expiry Check Items (network-wide, no store linkage available)...');

@@ -228,7 +228,10 @@ function main() {
       if (ms >= bestTime) { bestTime = ms; best = r; }
     }
     const storeId = get(best, au.idx, 'storeId');
-    const city = get(best, au.idx, 'storeLocation') || (storeMeta.get(storeId) || {}).city || 'Unknown';
+    // Store Master's city is authoritative; a per-audit-row storeLocation typo (e.g. an
+    // auditor picking the wrong city from a dropdown) must never override it, or the same
+    // store ends up double-counted as "audited" under two different cities.
+    const city = (storeMeta.get(storeId) || {}).city || get(best, au.idx, 'storeLocation') || 'Unknown';
     const meta = storeMeta.get(storeId) || {};
     audits.push({
       id: get(best, au.idx, 'id'),
@@ -279,7 +282,7 @@ function main() {
     const capaAuditId = get(r, ct.idx, 'auditId');
     if (!keptAuditIds.has(capaAuditId)) { capaSkippedDupe++; continue; }
     const storeId = get(r, ct.idx, 'storeId');
-    const city = get(r, ct.idx, 'storeLocation') || (storeMeta.get(storeId) || {}).city || 'Unknown';
+    const city = (storeMeta.get(storeId) || {}).city || get(r, ct.idx, 'storeLocation') || 'Unknown';
     const status = get(r, ct.idx, 'status') || 'Open';
     const createdAt = get(r, ct.idx, 'createdAt');
     const capaQuestionNo = get(r, ct.idx, 'questionNo');
@@ -347,7 +350,7 @@ function main() {
     if (!param || !PARAM_META[param]) continue; // skip blank/unmapped rows
     const response = get(r, ar.idx, 'response');
     const storeId = get(r, ar.idx, 'storeId');
-    const city = get(r, ar.idx, 'storeLocation') || (storeMeta.get(storeId) || {}).city || 'Unknown';
+    const city = (storeMeta.get(storeId) || {}).city || get(r, ar.idx, 'storeLocation') || 'Unknown';
     const meta = storeMeta.get(storeId) || {};
     const storeName = meta.storeName || get(r, ar.idx, 'storeName') || city;
     const stat = ensureParam(param);
@@ -564,7 +567,7 @@ function main() {
   for (const r of skuCsv.rows) {
     if (!keptAuditIds.has(get(r, skuCsv.idx, 'auditId'))) { skuSkippedDupe++; continue; }
     const storeId = get(r, skuCsv.idx, 'storeId');
-    const city = get(r, skuCsv.idx, 'storeLocation') || (storeMeta.get(storeId) || {}).city || 'Unknown';
+    const city = (storeMeta.get(storeId) || {}).city || get(r, skuCsv.idx, 'storeLocation') || 'Unknown';
     const storeName = get(r, skuCsv.idx, 'storeName') || (storeMeta.get(storeId) || {}).storeName || city;
     const expiry = get(r, skuCsv.idx, 'expiry');
     const fefoOk = get(r, skuCsv.idx, 'fefoOk');

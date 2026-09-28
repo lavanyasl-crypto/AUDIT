@@ -380,8 +380,7 @@
     var closedStorePct = storeIds.length ? Math.round(100*closedStores/storeIds.length) : 0;
     var cards = [
       { key:'cs-total', value:storeIds.length.toLocaleString(), label:'Stores with CAPA tasks' },
-      { key:'cs-open', value:openStores.toLocaleString(), label:'Stores — CAPA open' },
-      { key:'cs-progress', value:progressStores.toLocaleString(), label:'Stores — CAPA in progress' },
+      { key:'cs-open', value:(openStores+progressStores).toLocaleString(), label:'Stores — CAPA open' },
       { key:'cs-closed', value:closedStores.toLocaleString(), label:'Stores — CAPA fully closed' },
       { key:'cs-closed-pct', value:closedStorePct+'%', label:'Stores fully closed (%)' },
       { key:'cs-overdue', value:overdueTasks.toLocaleString(), label:'CAPA tasks overdue' },

@@ -210,12 +210,16 @@ function main() {
 
   console.log('Loading Audits...');
   const au = loadCSV(FILES.audits);
-  const auditGroups = new Map(); // storeId|date -> [rows]
+  // One audit per store per date per auditor: multiple submissions by the same
+  // auditor for the same store+day are resubmissions, not separate audits.
+  // (Different auditors auditing the same store on the same day ARE kept.)
+  const auditGroups = new Map(); // storeId|date|userEmail -> [rows]
   for (const r of au.rows) {
     const storeId = get(r, au.idx, 'storeId');
     const date = dateOnly(get(r, au.idx, 'auditDate'));
-    if (!storeId || !date) continue;
-    const key = storeId + '|' + date;
+    const auditor = get(r, au.idx, 'userEmail').toLowerCase();
+    if (!storeId || !date || !auditor) continue;
+    const key = storeId + '|' + date + '|' + auditor;
     if (!auditGroups.has(key)) auditGroups.set(key, []);
     auditGroups.get(key).push(r);
   }
@@ -278,9 +282,20 @@ function main() {
   const ct = loadCSV(FILES.capa);
   const capa = [];
   let capaSkippedDupe = 0;
+  const idx_ct_created = ct.idx['createdAt'];
+  const capaGroupKeys = new Map(); // auditId|questionNo -> best row (keep latest createdAt)
   for (const r of ct.rows) {
     const capaAuditId = get(r, ct.idx, 'auditId');
     if (!keptAuditIds.has(capaAuditId)) { capaSkippedDupe++; continue; }
+    const groupKey = capaAuditId + '|' + get(r, ct.idx, 'questionNo');
+    const prev = capaGroupKeys.get(groupKey);
+    if (!prev) { capaGroupKeys.set(groupKey, r); continue; }
+    const prevCreated = prev[idx_ct_created] || '';
+    const thisCreated = get(r, ct.idx, 'createdAt');
+    if (thisCreated >= prevCreated) capaGroupKeys.set(groupKey, r); else capaSkippedDupe++;
+  }
+  for (const r of capaGroupKeys.values()) {
+    const capaAuditId = get(r, ct.idx, 'auditId');
     const storeId = get(r, ct.idx, 'storeId');
     const city = (storeMeta.get(storeId) || {}).city || get(r, ct.idx, 'storeLocation') || 'Unknown';
     const status = get(r, ct.idx, 'status') || 'Open';
@@ -327,7 +342,7 @@ function main() {
   const capaStatusCounts = { Open: 0, 'In Progress': 0, Closed: 0 };
   const capaSlaCounts = { closed_on_time: 0, closed_late: 0, open_on_track: 0, open_overdue: 0, in_progress_on_track: 0, in_progress_overdue: 0 };
   for (const c of capa) { capaStatusCounts[c.status] = (capaStatusCounts[c.status] || 0) + 1; capaSlaCounts[c.slaState]++; }
-  console.log(`  ${capa.length} CAPA tasks (${capaSkippedDupe} skipped, tied to a superseded resubmission):`, capaStatusCounts, capaSlaCounts);
+  console.log(`  ${capa.length} CAPA tasks (${capaSkippedDupe} skipped: superseded resubmissions + duplicate auditId/questionNo rows):`, capaStatusCounts, capaSlaCounts);
 
   console.log('Loading Audit Responses (category/parameter compliance)...');
   const ar = loadCSV(FILES.responses);

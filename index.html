@@ -373,18 +373,12 @@
       var status = classifyStoreCapa(byStore[id]);
       if (status==='Closed') closedStores++; else if (status==='Open') openStores++; else progressStores++;
     });
-    var overdueTasks = rows.filter(function(c){ return c.slaState==='open_overdue'||c.slaState==='in_progress_overdue'; }).length;
-    var closedTotal = rows.filter(function(c){ return c.status==='Closed'; }).length;
-    var closedOnTime = rows.filter(function(c){ return c.slaState==='closed_on_time'; }).length;
-    var onTimeRate = closedTotal ? Math.round(100*closedOnTime/closedTotal) : 0;
     var closedStorePct = storeIds.length ? Math.round(100*closedStores/storeIds.length) : 0;
     var cards = [
       { key:'cs-total', value:storeIds.length.toLocaleString(), label:'Stores with CAPA tasks' },
       { key:'cs-open', value:(openStores+progressStores).toLocaleString(), label:'Stores — CAPA open' },
       { key:'cs-closed', value:closedStores.toLocaleString(), label:'Stores — CAPA fully closed' },
       { key:'cs-closed-pct', value:closedStorePct+'%', label:'Stores fully closed (%)' },
-      { key:'cs-overdue', value:overdueTasks.toLocaleString(), label:'CAPA tasks overdue' },
-      { key:'cs-ontime', value:onTimeRate+'%', label:'Tasks closed on time (of closed)' },
     ];
     el.innerHTML = cards.map(function(c){ return Charts.kpiCard({ key:c.key, value:c.value, label:c.label }); }).join('');
     var cat = Dashboard.state.categoryTab || 'exec';

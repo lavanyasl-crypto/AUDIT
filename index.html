@@ -145,6 +145,12 @@
       <div class="section-sub" id="capaKpiSubtitle" style="margin-bottom:10px"></div>
       <div class="grid kpi-grid" id="capaKpiGrid"></div>
 
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Audit → CAPA coverage</div>
+        <div class="section-sub" id="capaCoverageSubtitle"></div>
+        <div id="capaCoverage"></div>
+      </div>
+
       <div class="two-col" style="margin-top:16px">
         <div class="card"><div class="card-title">Store CAPA status</div><div id="capaDonut"></div></div>
         <div class="card"><div class="card-title">Fixed on time vs late vs overdue</div><div id="slaDonut"></div></div>
@@ -386,6 +392,48 @@
     document.getElementById('capaKpiSubtitle').textContent = 'Store status reflects its worst open CAPA task in the current filters (' + (CATEGORY_TITLES[cat]||cat) + ', ' + scope + '). The donut charts and table below stay unscoped by category — city/date filters only.';
   }
 
+  // ---------------- Audit → CAPA coverage ----------------
+  // Answers "why don't all audits have CAPA?" — clean audits generate no tasks by design;
+  // the rest should, and the gaps are split into email-never-sent vs tasks-not-in-export.
+  function renderCapaCoverage(f){
+    var el = document.getElementById('capaCoverage'); if (!el) return;
+    var audits = f.audits;
+    var capaAuditIds = new Set(f.capa.map(function(c){ return c.auditId; }));
+    var withCapa = 0, clean = 0, mailNotSent = [], mailSentNoTasks = [];
+    audits.forEach(function(a){
+      var hasFindings = (a.nc + a.pc) > 0;
+      if (!hasFindings){ clean++; return; }
+      if (capaAuditIds.has(a.id)) { withCapa++; return; }
+      if (a.capaMailStatus === 'sent') mailSentNoTasks.push(a);
+      else mailNotSent.push(a);
+    });
+    var withFindings = withCapa + mailNotSent.length + mailSentNoTasks.length;
+    var rows = [
+      { label:'Audits with CAPA tasks', n:withCapa, cls:'good',
+        hint:'Findings recorded and CAPA sent to the store manager' },
+      { label:'Clean audits — no CAPA needed', n:clean, cls:'info',
+        hint:'Zero non-compliances (NC) and partial compliances (PC), so nothing to close' },
+      { label:'Findings but CAPA email not sent', n:mailNotSent.length, cls:'bad',
+        hint:'CAPA mail status blank in the tool — follow up in the Pod Audit Tool' },
+      { label:'CAPA sent, tasks not in export yet', n:mailSentNoTasks.length, cls:'warn',
+        hint:'Usually recent audits (last few days) or a sync gap in the CAPA Tasks export' },
+    ];
+    el.innerHTML = '<div class="table-wrap"><table class="datatable"><thead><tr>'+
+      '<th>Bucket</th><th style="text-align:right">Audits</th><th>% of audits with findings</th><th>What it means</th>'+
+      '</tr></thead><tbody>'+
+      rows.map(function(r){
+        var pct = withFindings ? Math.round(100*r.n/withFindings) : 0;
+        return '<tr><td><span class="badge '+r.cls+'">'+r.label+'</span></td>'+
+          '<td class="cnt-cell" style="text-align:right"><span>'+r.n.toLocaleString()+'</span></td>'+
+          '<td class="cnt-cell" style="text-align:right;opacity:.75"><span>'+(r.label.indexOf('Clean')===0?'—':pct+'%')+'</span></td>'+
+          '<td style="opacity:.75;font-size:12px">'+r.hint+'</td></tr>';
+      }).join('')+
+      '</tbody></table></div>';
+    var sub = document.getElementById('capaCoverageSubtitle');
+    if (sub) sub.textContent = withFindings.toLocaleString() + ' of ' + audits.length.toLocaleString() +
+      ' audits had findings, so a CAPA went to the store manager for each. The rest were clean — no CAPA is generated when there is nothing to fix.';
+  }
+
   function renderCapaBreakdown(f){
     var el = document.getElementById('capaBreakdown'); if (!el) return;
     var rows = capaCategoryFilter(f.capa);
@@ -462,6 +510,7 @@
   window.onDashboardRefresh = function(f){
     renderOverviewKpis(f);
     renderCapaKpis(f);
+    renderCapaCoverage(f);
     renderCapaBreakdown(f);
     syncAllFilterUI();
     refreshDateStatusText();

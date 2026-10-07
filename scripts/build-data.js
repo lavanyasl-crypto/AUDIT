@@ -8,35 +8,62 @@ const ROOT = path.join(__dirname, '..', '..'); // "Audit tracking - CAPA closure
 const OUT_JS = path.join(__dirname, '..', 'data', 'dashboard-data.js');
 
 // Google Sheets exports get a fresh auto-numbered suffix "(1)", "(2)", etc. every time
-// they're re-downloaded, so we resolve by folder + stable name prefix instead of an exact
-// filename, picking the most recently modified match if more than one is present.
-function resolveFile(dir, prefix) {
+// they're re-downloaded, and exports are sometimes partial (e.g. a day-slice instead of the
+// full history), so no single file is guaranteed complete. We therefore merge EVERY CSV
+// matching the folder + name prefix and drop exact-duplicate rows; the per-entity dedup
+// downstream (store+date+auditor for audits, auditId+questionNo for CAPA, keptAuditIds gate)
+// collapses overlapping history safely.
+function loadMergedCSV(dir, prefix) {
   const full = path.join(ROOT, dir);
   const matches = fs.readdirSync(full)
     .filter((f) => f.toLowerCase().endsWith('.csv') && f.startsWith(prefix))
-    .map((f) => ({ f, mtime: fs.statSync(path.join(full, f)).mtimeMs }))
-    .sort((a, b) => b.mtime - a.mtime);
+    .sort();
   if (!matches.length) {
     throw new Error(`No CSV starting with "${prefix}" found in "${dir}"`);
   }
-  return path.join(full, matches[0].f);
+  let headers = null;
+  const seen = new Set();
+  const rows = [];
+  let skippedDupeRows = 0;
+  for (const f of matches) {
+    const { headers: h, rows: rs } = loadCSV(path.join(full, f));
+    if (!headers) headers = h;
+    else if (h.join('\u0000') !== headers.join('\u0000')) {
+      throw new Error(`Header mismatch in ${dir}/${f} vs first file ${matches[0]}`);
+    }
+    for (const r of rs) {
+      const key = r.join('\u0000');
+      if (seen.has(key)) { skippedDupeRows++; continue; }
+      seen.add(key);
+      rows.push(r);
+    }
+  }
+  const idx = {};
+  headers.forEach((hh, i) => (idx[hh] = i));
+  return { headers, idx, rows, skippedDupeRows };
 }
 
 const FILES = {
-  storeMaster: resolveFile('Store master', 'Pod Audit Tool - Store Master'),
-  audits: resolveFile('Audits', 'Pod Audit Tool - Audits'),
-  capa: resolveFile('Capa Tasks', 'Pod Audit Tool - CAPA Tasks'),
-  responses: resolveFile('Audit Response', 'Pod Audit Tool - Audit Responses'),
-  sku: resolveFile('Audit SKU wise', 'Pod Audit Tool - Audit Sku Checks'),
-  zoneVerify: resolveFile('Zone verify check', 'Pod Audit Tool - Audit Zone Verify Checks'),
-  expiryItems: resolveFile('expiry check items', 'Pod Audit Tool - Expiry Check Items'),
-  clusterDetails: resolveFile('Cluster details', 'Daily Review-redline - WTD'),
+  storeMaster: { dir: 'Store master', prefix: 'Pod Audit Tool - Store Master' },
+  audits: { dir: 'Audits', prefix: 'Pod Audit Tool - Audits' },
+  capa: { dir: 'Capa Tasks', prefix: 'Pod Audit Tool - CAPA Tasks' },
+  responses: { dir: 'Audit Response', prefix: 'Pod Audit Tool - Audit Responses' },
+  sku: { dir: 'Audit SKU wise', prefix: 'Pod Audit Tool - Audit Sku Checks' },
+  zoneVerify: { dir: 'Zone verify check', prefix: 'Pod Audit Tool - Audit Zone Verify Checks' },
+  expiryItems: { dir: 'expiry check items', prefix: 'Pod Audit Tool - Expiry Check Items' },
+  clusterDetails: { dir: 'Cluster details', prefix: 'Daily Review-redline - WTD' },
   // Deliberately not deep-processed:
   //  - "Audit Response wide" is the same data as `responses`, just pivoted wide (one row per
   //    audit, one column per checkpoint). We already get everything from the long format.
   //  - "Audit Logs" is app-usage telemetry (session_start/page_view/submit_* events), not
   //    audit findings — it has no compliance/CAPA content to report on.
 };
+
+const FILE = FILES; // loadMerged(FILE.x) shorthand at call sites
+
+function loadMerged(def) {
+  return loadMergedCSV(def.dir, def.prefix);
+}
 
 // ---------- CSV parsing (RFC4180-ish, handles quoted commas/newlines) ----------
 function parseCSV(text) {
@@ -162,7 +189,7 @@ const CLUSTER_CITY_ALIASES = {
   'Trivandrum': 'Thiruvananthapuram',
 };
 function loadClusterMaps() {
-  const cd = loadCSV(FILES.clusterDetails);
+  const cd = loadMerged(FILE.clusterDetails);
   const clusterByPodId = new Map();
   const clusterByCity = new Map();
   for (const r of cd.rows) {
@@ -190,7 +217,7 @@ function main() {
   const { resolveCluster } = loadClusterMaps();
 
   console.log('Loading Store Master...');
-  const sm = loadCSV(FILES.storeMaster);
+  const sm = loadMerged(FILE.storeMaster);
   const storeMeta = new Map(); // storeId -> {city, storeName, cluster}
   const cityTotals = new Map(); // city -> total store count
   const clusterByCityResolved = new Map(); // city -> cluster (for byCity rollups)
@@ -209,7 +236,7 @@ function main() {
   console.log(`  ${sm.rows.length} stores, ${unmappedStoreCount} unmapped to a cluster`);
 
   console.log('Loading Audits...');
-  const au = loadCSV(FILES.audits);
+  const au = loadMerged(FILE.audits);
   // One audit per store per date per auditor: multiple submissions by the same
   // auditor for the same store+day are resubmissions, not separate audits.
   // (Different auditors auditing the same store on the same day ARE kept.)
@@ -271,7 +298,7 @@ function main() {
   // trusting the CAPA sheet's own category text. Covers 6,361 of 6,375 tasks (99.8%);
   // the rest fall back to null (folded into "Other Brands" in the CAPA UI).
   console.log('Loading Audit Responses (for CAPA category join)...');
-  const arForCapaJoin = loadCSV(FILES.responses);
+  const arForCapaJoin = loadMerged(FILE.responses);
   const capaCategoryByAuditQ = new Map();
   for (const r of arForCapaJoin.rows) {
     const key = get(r, arForCapaJoin.idx, 'auditId') + '|' + get(r, arForCapaJoin.idx, 'questionNo');
@@ -279,7 +306,7 @@ function main() {
   }
 
   console.log('Loading CAPA Tasks...');
-  const ct = loadCSV(FILES.capa);
+  const ct = loadMerged(FILE.capa);
   const capa = [];
   let capaSkippedDupe = 0;
   const idx_ct_created = ct.idx['createdAt'];
@@ -345,7 +372,7 @@ function main() {
   console.log(`  ${capa.length} CAPA tasks (${capaSkippedDupe} skipped: superseded resubmissions + duplicate auditId/questionNo rows):`, capaStatusCounts, capaSlaCounts);
 
   console.log('Loading Audit Responses (category/parameter compliance)...');
-  const ar = loadCSV(FILES.responses);
+  const ar = loadMerged(FILE.responses);
   const paramStats = new Map(); // paramKey -> {compliant,nonCompliant,partial,na,byCity:Map,byPod:Map}
   const drilldown = new Map(); // paramKey -> [] noncompliant/partial records
   function ensureParam(key) {
@@ -574,7 +601,7 @@ function main() {
 
   // ---------- Audit SKU wise: per-SKU expiry / FEFO / puffing / location findings ----------
   console.log('Loading Audit SKU wise checks...');
-  const skuCsv = loadCSV(FILES.sku);
+  const skuCsv = loadMerged(FILE.sku);
   const skuAgg = { total: 0, expired: 0, fefoViolations: 0, puffingViolations: 0, locationDeviations: 0 };
   const skuByCity = new Map(), skuByPod = new Map();
   const skuExpiredList = []; // drilldown: actual expired SKU findings with names
@@ -622,7 +649,7 @@ function main() {
 
   // ---------- Zone verify check: SKU found in wrong storage zone ----------
   console.log('Loading Zone verify checks...');
-  const zv = loadCSV(FILES.zoneVerify);
+  const zv = loadMerged(FILE.zoneVerify);
   const auditIndex = new Map(audits.map((a) => [a.id, a])); // auditId -> canonical audit (city/store)
   const zvAgg = { total: 0, wrongLocation: 0 };
   const zvByCity = new Map();
@@ -644,7 +671,7 @@ function main() {
 
   // ---------- Expiry Check Items: network-wide only (export has no store/audit reference) ----------
   console.log('Loading Expiry Check Items (network-wide, no store linkage available)...');
-  const eci = loadCSV(FILES.expiryItems);
+  const eci = loadMerged(FILE.expiryItems);
   let eciExpired = 0;
   for (const r of eci.rows) if (get(r, eci.idx, 'status') === 'Expiry') eciExpired++;
   console.log(`  ${eci.rows.length} items logged: ${eciExpired} flagged expired`);

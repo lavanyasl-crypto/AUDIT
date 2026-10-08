@@ -283,12 +283,13 @@ function main() {
   }
   audits.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  // The Audits.csv export is sometimes a stale/partial slice (e.g. 2026-10-08 11:01 export
-  // missing 94 audits first submitted on Oct 7 and 42 on Oct 8, all present in the fresher
-  // Audit Responses export). Rebuild those missing audits from the responses file so daily
-  // counts don't silently under-report. date = first submission day (UTC), which matches
-  // the auditDate the tool itself assigns on same-day submission; score rollup uses the
-  // per-question `score` column (max 2 per scored question, same as scorePercent's basis).
+  // The Audits.csv export is sometimes a stale/partial slice (e.g. the 2026-10-08 11:01
+  // export was missing 94 audits first submitted on Oct 7 and 42 on Oct 8, all present in
+  // the fresher Audit Responses export). Rebuild those missing audits from the responses
+  // file so daily counts don't silently under-report. date = first submission day (UTC),
+  // which matches the auditDate the tool itself assigns on same-day submission; score
+  // rollup uses the per-question `score` column (max 2 per scored question, same basis
+  // as scorePercent).
   console.log('Synthesizing audits missing from Audits.csv (from Audit Responses)...');
   const arSrc = loadMerged(FILE.responses);
   const respAgg = new Map(); // auditId -> rollup

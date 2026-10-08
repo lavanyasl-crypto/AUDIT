@@ -87,7 +87,9 @@ function parseCSV(text) {
 }
 
 function loadCSV(filePath) {
-  const text = fs.readFileSync(filePath, 'utf8');
+  // Some Google Sheets exports prepend a UTF-8 BOM, which would otherwise glue
+  // itself onto the first header name ("﻿id") and break every column lookup.
+  const text = fs.readFileSync(filePath, 'utf8').replace(/^﻿/, '');
   const rows = parseCSV(text);
   const headers = rows[0];
   const idx = {};
@@ -279,6 +281,75 @@ function main() {
       resubmissions: group.length - 1,
     });
   }
+  audits.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+  // The Audits.csv export is sometimes a stale/partial slice (e.g. 2026-10-08 11:01 export
+  // missing 94 audits first submitted on Oct 7 and 42 on Oct 8, all present in the fresher
+  // Audit Responses export). Rebuild those missing audits from the responses file so daily
+  // counts don't silently under-report. date = first submission day (UTC), which matches
+  // the auditDate the tool itself assigns on same-day submission; score rollup uses the
+  // per-question `score` column (max 2 per scored question, same as scorePercent's basis).
+  console.log('Synthesizing audits missing from Audits.csv (from Audit Responses)...');
+  const arSrc = loadMerged(FILE.responses);
+  const respAgg = new Map(); // auditId -> rollup
+  for (const r of arSrc.rows) {
+    const aid = get(r, arSrc.idx, 'auditId');
+    if (!aid) continue;
+    if (!respAgg.has(aid)) respAgg.set(aid, {
+      username: get(r, arSrc.idx, 'username'),
+      storeId: get(r, arSrc.idx, 'storeId'),
+      storeLocation: get(r, arSrc.idx, 'storeLocation'),
+      firstCreated: get(r, arSrc.idx, 'createdAt'),
+      score: 0, maxScore: 0, nc: 0, pc: 0, na: 0,
+    });
+    const v = respAgg.get(aid);
+    const created = get(r, arSrc.idx, 'createdAt');
+    if (created && created < v.firstCreated) v.firstCreated = created;
+    const score = parseFloat(get(r, arSrc.idx, 'score'));
+    if (!isNaN(score)) { v.score += score; v.maxScore += 2; }
+    const response = get(r, arSrc.idx, 'response');
+    if (response === 'Non Compliance') v.nc++;
+    else if (response === 'Partially Complied') v.pc++;
+    else if (response && response !== 'Compliance') v.na++;
+  }
+  const auditedIds = new Set(audits.map((a) => a.id));
+  // Collapse resubmissions among recovered audits too: same store+day+auditor = one visit.
+  // Response rows only carry the auditor's display name, which can't be matched to the
+  // Audits.csv email key reliably — so skip any recovered id whose auditId exists in
+  // the raw Audits.csv (it's a superseded resubmission of a kept visit).
+  const rawAuditIds = new Set(au.rows.map((r) => get(r, au.idx, 'id')).filter(Boolean));
+  const recoveredByKey = new Map(); // storeId|date|auditor -> best synthesized audit
+  let synthesized = 0;
+  let synthesizedRaw = 0;
+  for (const [aid, v] of respAgg) {
+    if (auditedIds.has(aid) || rawAuditIds.has(aid)) continue;
+    const date = dateOnly(v.firstCreated);
+    if (!date || !v.storeId || !v.username) continue;
+    const key = v.storeId + '|' + date + '|' + v.username.toLowerCase();
+    synthesizedRaw++;
+    const prev = recoveredByKey.get(key);
+    if (!prev || v.firstCreated < prev.firstCreated) recoveredByKey.set(key, { aid, ...v, date });
+  }
+  for (const { aid, ...v } of recoveredByKey.values()) {
+    const storeMetaS = storeMeta.get(v.storeId) || {};
+    const city = storeMetaS.city || v.storeLocation || 'Unknown';
+    audits.push({
+      id: aid,
+      date: v.date,
+      storeId: v.storeId,
+      city,
+      cluster: storeMetaS.cluster || resolveCluster(v.storeId, v.city || city),
+      storeName: storeMetaS.storeName || v.storeLocation || 'Unknown',
+      scorePercent: v.maxScore ? Math.round((v.score / v.maxScore) * 1000) / 10 : 0,
+      nc: v.nc, pc: v.pc, na: v.na,
+      capaMailStatus: 'blank',
+      resubmissions: 0,
+      synthesized: true,
+    });
+    synthesized++;
+  }
+  if (synthesized) console.log(`  + ${synthesized} audits recovered from Audit Responses (${synthesizedRaw} raw missing rows -> deduped by store+day+auditor)`);
+
   audits.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const maxDate = audits.reduce((m, a) => (a.date > m ? a.date : m), audits[0] ? audits[0].date : '');
   const NOW = new Date(maxDate + 'T23:59:59Z');

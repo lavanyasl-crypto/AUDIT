@@ -15,8 +15,17 @@ const OUT_JS = path.join(__dirname, '..', 'data', 'dashboard-data.js');
 // collapses overlapping history safely.
 function loadMergedCSV(dir, prefix) {
   const full = path.join(ROOT, dir);
-  const matches = fs.readdirSync(full)
-    .filter((f) => f.toLowerCase().endsWith('.csv') && f.startsWith(prefix))
+  // Scan subfolders too (e.g. "backup 2026-10-08") — full-history files sometimes end up there.
+  const walk = (d) =>
+    fs
+      .readdirSync(d, { withFileTypes: true })
+      .flatMap((e) => {
+        const p = path.join(d, e.name);
+        return e.isDirectory() ? walk(p) : [p];
+      });
+  const matches = walk(full)
+    .map((p) => path.relative(full, p).replaceAll('\\', '/'))
+    .filter((rel) => rel.toLowerCase().endsWith('.csv') && path.basename(rel).startsWith(prefix))
     .sort();
   if (!matches.length) {
     throw new Error(`No CSV starting with "${prefix}" found in "${dir}"`);
@@ -25,11 +34,11 @@ function loadMergedCSV(dir, prefix) {
   const seen = new Set();
   const rows = [];
   let skippedDupeRows = 0;
-  for (const f of matches) {
-    const { headers: h, rows: rs } = loadCSV(path.join(full, f));
+  for (const rel of matches) {
+    const { headers: h, rows: rs } = loadCSV(path.join(full, rel));
     if (!headers) headers = h;
     else if (h.join('\u0000') !== headers.join('\u0000')) {
-      throw new Error(`Header mismatch in ${dir}/${f} vs first file ${matches[0]}`);
+      throw new Error(`Header mismatch in ${dir}/${rel} vs first file ${matches[0]}`);
     }
     for (const r of rs) {
       const key = r.join('\u0000');

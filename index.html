@@ -380,16 +380,29 @@
       if (status==='Closed') closedStores++; else if (status==='Open') openStores++; else progressStores++;
     });
     var closedStorePct = storeIds.length ? Math.round(100*closedStores/storeIds.length) : 0;
+    // audit-level CAPA sharing: of audits that had findings, how many got CAPA tasks
+    var capaAuditIds = {};
+    f.capa.forEach(function(c){ capaAuditIds[c.auditId] = true; });
+    var auditsWithFindings=0, auditsWithCapa=0;
+    f.audits.forEach(function(a){
+      if ((a.nc + a.pc) > 0){
+        auditsWithFindings++;
+        if (capaAuditIds[a.id]) auditsWithCapa++;
+      }
+    });
+    var capaSharePct = auditsWithFindings ? Math.round(1000*auditsWithCapa/auditsWithFindings)/10 : 0;
     var cards = [
       { key:'cs-total', value:storeIds.length.toLocaleString(), label:'Stores with CAPA tasks' },
       { key:'cs-open', value:(openStores+progressStores).toLocaleString(), label:'Stores — CAPA open' },
       { key:'cs-closed', value:closedStores.toLocaleString(), label:'Stores — CAPA fully closed' },
       { key:'cs-closed-pct', value:closedStorePct+'%', label:'Stores fully closed (%)' },
+      { key:'cs-audits-capa', value:auditsWithCapa.toLocaleString()+' / '+auditsWithFindings.toLocaleString(), label:'Audits with CAPA shared' },
+      { key:'cs-audits-rate', value:capaSharePct+'%', label:'CAPA shared rate (%)' },
     ];
     el.innerHTML = cards.map(function(c){ return Charts.kpiCard({ key:c.key, value:c.value, label:c.label }); }).join('');
     var cat = Dashboard.state.categoryTab || 'exec';
     var scope = Dashboard.state.clusters ? Array.from(Dashboard.state.clusters).join(', ') : (Dashboard.state.cities ? Array.from(Dashboard.state.cities).join(', ') : 'PAN India');
-    document.getElementById('capaKpiSubtitle').textContent = 'Store status reflects its worst open CAPA task in the current filters (' + (CATEGORY_TITLES[cat]||cat) + ', ' + scope + '). The donut charts and table below stay unscoped by category — city/date filters only.';
+    document.getElementById('capaKpiSubtitle').textContent = 'Store status reflects its worst open CAPA task in the current filters (' + (CATEGORY_TITLES[cat]||cat) + ', ' + scope + '). CAPA shared rate = audits with CAPA tasks ÷ audits that had findings (clean audits need no CAPA). The donut charts and table below stay unscoped by category — city/date filters only.';
   }
 
   // ---------------- Audit → CAPA coverage ----------------

@@ -379,7 +379,12 @@
       var status = classifyStoreCapa(byStore[id]);
       if (status==='Closed') closedStores++; else if (status==='Open') openStores++; else progressStores++;
     });
-    var closedStorePct = storeIds.length ? Math.round(100*closedStores/storeIds.length) : 0;
+    // "fully closed" card = stores with at least one Closed CAPA task (user-confirmed definition, 2026-10-14)
+    var anyClosedStores = 0;
+    storeIds.forEach(function(id){
+      if (byStore[id].some(function(c){ return c.status === 'Closed'; })) anyClosedStores++;
+    });
+    var closedStorePct = storeIds.length ? Math.round(100*anyClosedStores/storeIds.length) : 0;
     // audit-level CAPA sharing: of audits that had findings, how many got CAPA tasks
     var capaAuditIds = {};
     f.capa.forEach(function(c){ capaAuditIds[c.auditId] = true; });
@@ -394,7 +399,7 @@
     var cards = [
       { key:'cs-total', value:storeIds.length.toLocaleString(), label:'Stores with CAPA tasks' },
       { key:'cs-open', value:(openStores+progressStores).toLocaleString(), label:'Stores — CAPA open' },
-      { key:'cs-closed', value:closedStores.toLocaleString(), label:'Stores — CAPA fully closed' },
+      { key:'cs-closed', value:anyClosedStores.toLocaleString(), label:'Stores — CAPA fully closed' },
       { key:'cs-closed-pct', value:closedStorePct+'%', label:'Stores fully closed (%)' },
       { key:'cs-audits-capa', value:auditsWithCapa.toLocaleString()+' / '+auditsWithFindings.toLocaleString(), label:'Audits with CAPA shared' },
       { key:'cs-audits-rate', value:capaSharePct+'%', label:'CAPA shared rate (%)' },

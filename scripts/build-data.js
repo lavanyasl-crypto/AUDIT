@@ -403,7 +403,12 @@ function main() {
   }
   for (const r of capaGroupKeys.values()) {
     const capaAuditId = get(r, ct.idx, 'auditId');
-    const storeId = get(r, ct.idx, 'storeId');
+    // Correlate with the Audits tab: the CAPA sheet's own storeId is sometimes blank
+    // (5 rows) and its auditDate blank on 55% of rows (plus IST/UTC day shifts on others).
+    // The joined audit is canonical for both — the audit belongs to exactly one store
+    // and one day, so every CAPA task from it must filter and group identically.
+    const parentAudit = audits.find((a) => a.id === capaAuditId);
+    const storeId = parentAudit ? parentAudit.storeId : (get(r, ct.idx, 'storeId') || null);
     const city = (storeMeta.get(storeId) || {}).city || get(r, ct.idx, 'storeLocation') || 'Unknown';
     const status = get(r, ct.idx, 'status') || 'Open';
     const createdAt = get(r, ct.idx, 'createdAt');
@@ -438,7 +443,7 @@ function main() {
       auditorName: get(r, ct.idx, 'auditorName'),
       assignedPodEmail: get(r, ct.idx, 'assignedPodEmail'),
       status, slaState, overdueDays,
-      auditDate: dateOnly(get(r, ct.idx, 'auditDate')),
+      auditDate: parentAudit ? parentAudit.date : dateOnly(get(r, ct.idx, 'auditDate')),
       createdAt, dueAt, closedAt,
       closedBy: get(r, ct.idx, 'closedBy'),
       closureRemark: get(r, ct.idx, 'closureRemark'),

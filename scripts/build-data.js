@@ -11,7 +11,7 @@ const OUT_JS = path.join(__dirname, '..', 'data', 'dashboard-data.js');
 // they're re-downloaded, and exports are sometimes partial (e.g. a day-slice instead of the
 // full history), so no single file is guaranteed complete. We therefore merge EVERY CSV
 // matching the folder + name prefix and drop exact-duplicate rows; the per-entity dedup
-// downstream (store+date+auditor for audits, auditId+questionNo for CAPA, keptAuditIds gate)
+// downstream (store+date for audits, auditId+questionNo for CAPA, keptAuditIds gate)
 // collapses overlapping history safely.
 function loadMergedCSV(dir, prefix) {
   const full = path.join(ROOT, dir);
@@ -248,16 +248,15 @@ function main() {
 
   console.log('Loading Audits...');
   const au = loadMerged(FILE.audits);
-  // One audit per store per date per auditor: multiple submissions by the same
-  // auditor for the same store+day are resubmissions, not separate audits.
-  // (Different auditors auditing the same store on the same day ARE kept.)
-  const auditGroups = new Map(); // storeId|date|userEmail -> [rows]
+  // One audit per store per date: multiple submissions for the same store+day
+  // (whether resubmissions by the same auditor or separate audits by different
+  // auditors) count as one visit. Keep the latest submission by startedAt.
+  const auditGroups = new Map(); // storeId|date -> [rows]
   for (const r of au.rows) {
     const storeId = get(r, au.idx, 'storeId');
     const date = dateOnly(get(r, au.idx, 'auditDate'));
-    const auditor = get(r, au.idx, 'userEmail').toLowerCase();
-    if (!storeId || !date || !auditor) continue;
-    const key = storeId + '|' + date + '|' + auditor;
+    if (!storeId || !date) continue;
+    const key = storeId + '|' + date;
     if (!auditGroups.has(key)) auditGroups.set(key, []);
     auditGroups.get(key).push(r);
   }
@@ -323,19 +322,19 @@ function main() {
     else if (response && response !== 'Compliance') v.na++;
   }
   const auditedIds = new Set(audits.map((a) => a.id));
-  // Collapse resubmissions among recovered audits too: same store+day+auditor = one visit.
+  // Collapse resubmissions among recovered audits too: same store+day = one visit.
   // Response rows only carry the auditor's display name, which can't be matched to the
   // Audits.csv email key reliably — so skip any recovered id whose auditId exists in
   // the raw Audits.csv (it's a superseded resubmission of a kept visit).
   const rawAuditIds = new Set(au.rows.map((r) => get(r, au.idx, 'id')).filter(Boolean));
-  const recoveredByKey = new Map(); // storeId|date|auditor -> best synthesized audit
+  const recoveredByKey = new Map(); // storeId|date -> best synthesized audit
   let synthesized = 0;
   let synthesizedRaw = 0;
   for (const [aid, v] of respAgg) {
     if (auditedIds.has(aid) || rawAuditIds.has(aid)) continue;
     const date = dateOnly(v.firstCreated);
     if (!date || !v.storeId || !v.username) continue;
-    const key = v.storeId + '|' + date + '|' + v.username.toLowerCase();
+    const key = v.storeId + '|' + date;
     synthesizedRaw++;
     const prev = recoveredByKey.get(key);
     if (!prev || v.firstCreated < prev.firstCreated) recoveredByKey.set(key, { aid, ...v, date });
@@ -358,7 +357,7 @@ function main() {
     });
     synthesized++;
   }
-  if (synthesized) console.log(`  + ${synthesized} audits recovered from Audit Responses (${synthesizedRaw} raw missing rows -> deduped by store+day+auditor)`);
+  if (synthesized) console.log(`  + ${synthesized} audits recovered from Audit Responses (${synthesizedRaw} raw missing rows -> deduped by store+day)`);
 
   audits.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const maxDate = audits.reduce((m, a) => (a.date > m ? a.date : m), audits[0] ? audits[0].date : '');

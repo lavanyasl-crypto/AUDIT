@@ -57,9 +57,9 @@ const FILES = {
   audits: { dir: 'Audits', prefix: 'Pod Audit Tool - Audits' },
   capa: { dir: 'Capa Tasks', prefix: 'Pod Audit Tool - CAPA Tasks' },
   responses: { dir: 'Audit Response', prefix: 'Pod Audit Tool - Audit Responses' },
-  sku: { dir: 'Audit SKU wise', prefix: 'Pod Audit Tool - Audit Sku Checks' },
+  sku: { dir: 'Audit SKU wise', prefix: 'Expiry Capture — Archive Data (cold history) - Audit Sku Checks' },
   zoneVerify: { dir: 'Zone verify check', prefix: 'Pod Audit Tool - Audit Zone Verify Checks' },
-  expiryItems: { dir: 'expiry check items', prefix: 'Pod Audit Tool - Expiry Check Items' },
+  expiryItems: { dir: 'expiry check items', prefix: 'Expiry Capture — Archive Data (cold history) - Expiry Check Items' },
   clusterDetails: { dir: 'Cluster details', prefix: 'Daily Review-redline - WTD' },
   // Deliberately not deep-processed:
   //  - "Audit Response wide" is the same data as `responses`, just pivoted wide (one row per

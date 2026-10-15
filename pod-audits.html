@@ -414,7 +414,7 @@
     el.innerHTML = cards.map(function(c){ return Charts.kpiCard({ key:c.key, value:c.value, label:c.label }); }).join('');
     var cat = Dashboard.state.categoryTab || 'exec';
     var scope = Dashboard.state.clusters ? Array.from(Dashboard.state.clusters).join(', ') : (Dashboard.state.cities ? Array.from(Dashboard.state.cities).join(', ') : 'PAN India');
-    document.getElementById('capaKpiSubtitle').textContent = 'Each audit visit with CAPA is Open while any of its tasks is open/in progress, and Closed once all its tasks are closed — so Audits — CAPA open + closed = Audits with CAPA shared (' + (CATEGORY_TITLES[cat]||cat) + ', ' + scope + '). CAPA shared rate = audits with CAPA tasks ÷ audits that had findings (clean audits need no CAPA). The donut charts and table below stay unscoped by category — city/date filters only.';
+    document.getElementById('capaKpiSubtitle').textContent = (CATEGORY_TITLES[cat]||cat) + ', ' + scope;
   }
 
   function renderCapaCoverage(f){

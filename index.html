@@ -229,10 +229,10 @@
       var btn = e.target.closest('.seg-btn'); if (!btn) return;
       var preset = btn.getAttribute('data-preset');
       var latest = D.meta.dateRange.to;
-      if (preset === 'day'){ Dashboard.state.dateFrom = latest; Dashboard.state.dateTo = latest; }
-      else if (preset === 'week'){ var d = new Date(latest+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-6); Dashboard.state.dateFrom = d.toISOString().slice(0,10); Dashboard.state.dateTo = latest; }
-      else if (preset === 'month'){ Dashboard.state.dateFrom = latest.slice(0,7)+'-01'; Dashboard.state.dateTo = latest; }
-      // 'custom' — leave From/To exactly as they are
+      if (preset === 'day'){ Dashboard.state.dateFrom = latest; Dashboard.state.dateTo = latest; Dashboard.state.datePresetCustom = false; }
+      else if (preset === 'week'){ var d = new Date(latest+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-6); Dashboard.state.dateFrom = d.toISOString().slice(0,10); Dashboard.state.dateTo = latest; Dashboard.state.datePresetCustom = false; }
+      else if (preset === 'month'){ Dashboard.state.dateFrom = latest.slice(0,7)+'-01'; Dashboard.state.dateTo = latest; Dashboard.state.datePresetCustom = false; }
+      else if (preset === 'custom'){ Dashboard.state.datePresetCustom = true; } // keep From/To as they are
       Dashboard.refreshAll();
     });
   });
@@ -290,12 +290,16 @@
     [dateFromEl, dateFromElCapa].forEach(function(el){ if (el) el.value = s.dateFrom; });
     [dateToEl, dateToElCapa].forEach(function(el){ if (el) el.value = s.dateTo; });
     var latest = D.meta.dateRange.to;
-    var preset = 'custom';
-    if (s.dateFrom === latest && s.dateTo === latest) preset = 'day';
+    var preset;
+    if (s.datePresetCustom) { preset = 'custom'; }
     else {
-      var wk = new Date(latest+'T00:00:00Z'); wk.setUTCDate(wk.getUTCDate()-6);
-      if (s.dateTo === latest && s.dateFrom === wk.toISOString().slice(0,10)) preset = 'week';
-      else if (s.dateTo === latest && s.dateFrom === latest.slice(0,7)+'-01') preset = 'month';
+      preset = 'custom';
+      if (s.dateFrom === latest && s.dateTo === latest) preset = 'day';
+      else {
+        var wk = new Date(latest+'T00:00:00Z'); wk.setUTCDate(wk.getUTCDate()-6);
+        if (s.dateTo === latest && s.dateFrom === wk.toISOString().slice(0,10)) preset = 'week';
+        else if (s.dateTo === latest && s.dateFrom === latest.slice(0,7)+'-01') preset = 'month';
+      }
     }
     [datePresetSeg, datePresetSegCapa].forEach(function(seg){ if (!seg) return; seg.querySelectorAll('.seg-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-preset')===preset); }); });
     var mode = s.geoMode || 'pan';
@@ -322,6 +326,7 @@
     Dashboard.state.geoMode = 'pan';
     Dashboard.state.dateFrom = D.meta.dateRange.from;
     Dashboard.state.dateTo = D.meta.dateRange.to;
+    Dashboard.state.datePresetCustom = false;
     Dashboard.state.latestOnly = false;
     Dashboard.state.categoryTab = 'exec';
     document.querySelectorAll('#auditRecencySeg .seg-btn').forEach(function(b,i){ b.classList.toggle('active', i===0); });

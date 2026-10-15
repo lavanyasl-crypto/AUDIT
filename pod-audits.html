@@ -379,40 +379,42 @@
     var byStore = {};
     rows.forEach(function(c){ (byStore[c.storeId] = byStore[c.storeId] || []).push(c); });
     var storeIds = Object.keys(byStore);
-    var closedStores=0, openStores=0, progressStores=0;
-    storeIds.forEach(function(id){
-      var status = classifyStoreCapa(byStore[id]);
-      if (status==='Closed') closedStores++; else if (status==='Open') openStores++; else progressStores++;
-    });
-    // "fully closed" card = stores with at least one Closed CAPA task (user-confirmed, 2026-10-14: 354 not 184)
-    var anyClosedStores = 0;
-    storeIds.forEach(function(id){
-      if (byStore[id].some(function(c){ return c.status === 'Closed'; })) anyClosedStores++;
-    });
-    var closedStorePct = storeIds.length ? Math.round(100*anyClosedStores/storeIds.length) : 0;
     // audit-level CAPA sharing: of audits that had findings, how many got CAPA tasks
     var capaAuditIds = {};
+    var capaAuditIdsShared = {};
     f.capa.forEach(function(c){ capaAuditIds[c.auditId] = true; });
     var auditsWithFindings=0, auditsWithCapa=0;
     f.audits.forEach(function(a){
       if ((a.nc + a.pc) > 0){
         auditsWithFindings++;
-        if (capaAuditIds[a.id]) auditsWithCapa++;
+        if (capaAuditIds[a.id]) { auditsWithCapa++; capaAuditIdsShared[a.id] = true; }
       }
     });
+    // audit-level status, over exactly the audits the shared card counts (findings + CAPA):
+    // an audit is "open" while ANY of its tasks is Open/In Progress, "closed" once all
+    // are Closed — so open + closed = audits with CAPA shared.
+    var byAudit = {};
+    f.capa.forEach(function(c){ if (capaAuditIdsShared[c.auditId]) (byAudit[c.auditId] = byAudit[c.auditId] || []).push(c); });
+    var auditsOpen=0, auditsClosed=0;
+    Object.keys(byAudit).forEach(function(id){
+      var tasks = byAudit[id];
+      if (tasks.some(function(c){ return c.status === 'Open' || c.status === 'In Progress'; })) auditsOpen++;
+      else auditsClosed++;
+    });
     var capaSharePct = auditsWithFindings ? Math.round(1000*auditsWithCapa/auditsWithFindings)/10 : 0;
+    var auditClosedPct = (auditsOpen+auditsClosed) ? Math.round(100*auditsClosed/(auditsOpen+auditsClosed)) : 0;
     var cards = [
       { key:'cs-total', value:storeIds.length.toLocaleString(), label:'Stores with CAPA tasks' },
-      { key:'cs-open', value:(openStores+progressStores).toLocaleString(), label:'Stores — CAPA open' },
-      { key:'cs-closed', value:anyClosedStores.toLocaleString(), label:'Stores — CAPA fully closed' },
-      { key:'cs-closed-pct', value:closedStorePct+'%', label:'Stores fully closed (%)' },
+      { key:'cs-open', value:auditsOpen.toLocaleString(), label:'Audits — CAPA open' },
+      { key:'cs-closed', value:auditsClosed.toLocaleString(), label:'Audits — CAPA closed' },
+      { key:'cs-closed-pct', value:auditClosedPct+'%', label:'Audits CAPA closed (%)' },
       { key:'cs-audits-capa', value:auditsWithCapa.toLocaleString()+' / '+auditsWithFindings.toLocaleString(), label:'Audits with CAPA shared' },
       { key:'cs-audits-rate', value:capaSharePct+'%', label:'CAPA shared rate (%)' },
     ];
     el.innerHTML = cards.map(function(c){ return Charts.kpiCard({ key:c.key, value:c.value, label:c.label }); }).join('');
     var cat = Dashboard.state.categoryTab || 'exec';
     var scope = Dashboard.state.clusters ? Array.from(Dashboard.state.clusters).join(', ') : (Dashboard.state.cities ? Array.from(Dashboard.state.cities).join(', ') : 'PAN India');
-    document.getElementById('capaKpiSubtitle').textContent = 'Store status reflects its worst open CAPA task in the current filters (' + (CATEGORY_TITLES[cat]||cat) + ', ' + scope + '). CAPA shared rate = audits with CAPA tasks ÷ audits that had findings (clean audits need no CAPA). The donut charts and table below stay unscoped by category — city/date filters only.';
+    document.getElementById('capaKpiSubtitle').textContent = 'Each audit visit with CAPA is Open while any of its tasks is open/in progress, and Closed once all its tasks are closed — so Audits — CAPA open + closed = Audits with CAPA shared (' + (CATEGORY_TITLES[cat]||cat) + ', ' + scope + '). CAPA shared rate = audits with CAPA tasks ÷ audits that had findings (clean audits need no CAPA). The donut charts and table below stay unscoped by category — city/date filters only.';
   }
 
   function renderCapaCoverage(f){

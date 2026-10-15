@@ -146,7 +146,7 @@
       labels: {
         'Expiry-Removal': 'Spoilage/Defect removal — non-compliant PODs',
         'Chiller-Temp': 'Chiller temp — non-compliant PODs',
-        'Stacking': 'Overloading of shelves — non-compliant PODs'
+        'Stacking': 'Overloading in shelves — number of PODs'
       }
     }
   };
@@ -422,13 +422,27 @@
     { key:'DBEM', label:'DBEM' }
   ];
 
+  // FNV table overrides (business-requested, 2026-10-15): Overloading in shelves
+  // first in the parameter list, under its own display name.
+  var CATEGORY_PARAM_OVERRIDES = {
+    FNV: {
+      first: 'Stacking',
+      displayNames: { 'Stacking': 'Overloading in shelves' }
+    }
+  };
   function categoryComplianceRows(catFilter){
     var cats = (catFilter && catFilter !== 'exec') ? [catFilter] : CATEGORY_ORDER;
     var rows = [];
     cats.forEach(function(cat){
-      (D.categoryCompliance[cat] || []).forEach(function(p){
+      var params = (D.categoryCompliance[cat] || []).slice();
+      var ov = CATEGORY_PARAM_OVERRIDES[cat];
+      if (ov && ov.first){
+        params.sort(function(a,b){ return (b.key===ov.first) - (a.key===ov.first); });
+      }
+      params.forEach(function(p){
         var c = paramPodCounts(p);
-        rows.push({ p:p, category:cat, fully:c.compliant, partial:c.partial, nc:c.nc, total:c.total });
+        var display = (ov && ov.displayNames && ov.displayNames[p.key]) || p.short;
+        rows.push({ p:p, display:display, category:cat, fully:c.compliant, partial:c.partial, nc:c.nc, total:c.total });
       });
     });
     return rows;
@@ -469,7 +483,7 @@
           var open = expandedKey===rowKey(r);
           var main = '<tr class="compliance-row" data-i="'+i+'" data-category="'+esc(r.category)+'">'+
             '<td>'+esc(r.category)+'</td>'+
-            '<td class="param-cell">'+(open?'▾':'▸')+' '+esc(r.p.short)+'</td>'+
+            '<td class="param-cell">'+(open?'▾':'▸')+' '+esc(r.display)+'</td>'+
             '<td class="cnt-cell" data-bucket="fully"><span>'+fmt(r.fully)+'</span></td>'+
             '<td class="cnt-cell" data-bucket="partial"><span>'+fmt(r.partial)+'</span></td>'+
             '<td class="cnt-cell" data-bucket="nc"><span>'+fmt(r.nc)+'</span></td>'+

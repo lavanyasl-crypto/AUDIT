@@ -451,7 +451,7 @@
   var CATEGORY_PARAM_OVERRIDES = {
     FNV: {
       leadOrder: ['Stacking','Expiry-Removal','Zone temp','Chiller-Temp'],
-      displayNames: { 'Stacking': 'Overloading in shelves', 'Zone temp': 'AC room temperature' }
+      displayNames: { 'Stacking': 'Overloading in shelves', 'Zone temp': 'AC room temperature', 'Expiry-Removal': 'Spoilage and Defect' }
     },
     Noice: {
       leadOrder: ['Expiry-Removal','Chiller-Temp','Freezer-Temp','AC Room-Temp','Puffed packs-Removal','FIFO/FEFO-Stacking','Storage Location Adherence']

@@ -149,6 +149,18 @@
         'Stacking': 'Overloading in shelves — number of PODs',
         'Zone temp': 'AC room temperature — non-compliant PODs'
       }
+    },
+    Noice: {
+      order: ['Expiry-Removal','Chiller-Temp','Freezer-Temp','AC Room-Temp','Puffed packs-Removal','FIFO/FEFO-Stacking','Storage Location Adherence'],
+      labels: {
+        'Expiry-Removal': 'Expiry removal — non-compliant PODs',
+        'Chiller-Temp': 'Chiller temp — non-compliant PODs',
+        'Freezer-Temp': 'Freezer temp — non-compliant PODs',
+        'AC Room-Temp': 'AC room temp — non-compliant PODs',
+        'Puffed packs-Removal': 'Puffing of packs — non-compliant PODs',
+        'FIFO/FEFO-Stacking': 'FIFO/FEFO Arrangements — non-compliant PODs',
+        'Storage Location Adherence': 'Storage location adherence — non-compliant PODs'
+      }
     }
   };
   function categoryNonCompliantCards(cat){
@@ -430,6 +442,9 @@
     FNV: {
       leadOrder: ['Stacking','Expiry-Removal','Zone temp','Chiller-Temp'],
       displayNames: { 'Stacking': 'Overloading in shelves', 'Zone temp': 'AC room temperature' }
+    },
+    Noice: {
+      leadOrder: ['Expiry-Removal','Chiller-Temp','Freezer-Temp','AC Room-Temp','Puffed packs-Removal','FIFO/FEFO-Stacking','Storage Location Adherence']
     }
   };
   function categoryComplianceRows(catFilter){

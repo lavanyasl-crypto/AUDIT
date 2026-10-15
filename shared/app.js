@@ -422,11 +422,12 @@
     { key:'DBEM', label:'DBEM' }
   ];
 
-  // FNV table overrides (business-requested, 2026-10-15): Overloading in shelves
-  // first in the parameter list, under its own display name.
+  // FNV table overrides (business-requested, 2026-10-15): Overloading in shelves,
+  // Expiry, Zone temperature and Chiller temp lead the parameter list, under
+  // Overloading's own display name.
   var CATEGORY_PARAM_OVERRIDES = {
     FNV: {
-      first: 'Stacking',
+      leadOrder: ['Stacking','Expiry-Removal','Zone temp','Chiller-Temp'],
       displayNames: { 'Stacking': 'Overloading in shelves' }
     }
   };
@@ -436,8 +437,14 @@
     cats.forEach(function(cat){
       var params = (D.categoryCompliance[cat] || []).slice();
       var ov = CATEGORY_PARAM_OVERRIDES[cat];
-      if (ov && ov.first){
-        params.sort(function(a,b){ return (b.key===ov.first) - (a.key===ov.first); });
+      if (ov && ov.leadOrder){
+        params.sort(function(a,b){
+          var ia = ov.leadOrder.indexOf(a.key), ib = ov.leadOrder.indexOf(b.key);
+          if (ia === -1 && ib === -1) return 0;
+          if (ia === -1) return 1;
+          if (ib === -1) return -1;
+          return ia - ib;
+        });
       }
       params.forEach(function(p){
         var c = paramPodCounts(p);

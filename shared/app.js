@@ -161,6 +161,16 @@
         'FIFO/FEFO-Stacking': 'FIFO/FEFO Arrangements — non-compliant PODs',
         'Storage Location Adherence': 'Storage location adherence — non-compliant PODs'
       }
+    },
+    DBEM: {
+      order: ['Expiry-Removal','Chiller-Temp','Freezer-Temp','FIFO/FEFO-Stacking','Storage Location Adherence'],
+      labels: {
+        'Expiry-Removal': 'Expiry removal — non-compliant PODs',
+        'Chiller-Temp': 'Chiller temp — non-compliant PODs',
+        'Freezer-Temp': 'Freezer temp — non-compliant PODs',
+        'FIFO/FEFO-Stacking': 'FIFO/FEFO Arrangements — non-compliant PODs',
+        'Storage Location Adherence': 'Storage location adherence — non-compliant PODs'
+      }
     }
   };
   function categoryNonCompliantCards(cat){
@@ -445,6 +455,9 @@
     },
     Noice: {
       leadOrder: ['Expiry-Removal','Chiller-Temp','Freezer-Temp','AC Room-Temp','Puffed packs-Removal','FIFO/FEFO-Stacking','Storage Location Adherence']
+    },
+    DBEM: {
+      leadOrder: ['Expiry-Removal','Chiller-Temp','Freezer-Temp','FIFO/FEFO-Stacking','Storage Location Adherence']
     }
   };
   function categoryComplianceRows(catFilter){

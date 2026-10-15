@@ -429,7 +429,7 @@
   var CATEGORY_PARAM_OVERRIDES = {
     FNV: {
       leadOrder: ['Stacking','Expiry-Removal','Zone temp','Chiller-Temp'],
-      displayNames: { 'Stacking': 'Overloading in shelves' }
+      displayNames: { 'Stacking': 'Overloading in shelves', 'Zone temp': 'AC room temperature' }
     }
   };
   function categoryComplianceRows(catFilter){

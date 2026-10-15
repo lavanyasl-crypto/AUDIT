@@ -471,11 +471,15 @@ function main() {
     return brandParamStats.get(key);
   }
   let arSkippedDupe = 0;
+  const responseTriples = []; // [auditId, paramKey, response] — lets the page recompute parameter stats for a subset of audits (e.g. latest-audit-per-store)
   for (const r of ar.rows) {
     if (!keptAuditIds.has(get(r, ar.idx, 'auditId'))) { arSkippedDupe++; continue; }
     const param = get(r, ar.idx, 'parameter');
     if (!param || !PARAM_META[param]) continue; // skip blank/unmapped rows
     const response = get(r, ar.idx, 'response');
+    // 4th element = business category (FNV/Noice/DBEM), '' when unattributable —
+    // lets the page recompute per-category stats for a subset of audits
+    responseTriples.push([get(r, ar.idx, 'auditId'), param, response, normalizeCategory(get(r, ar.idx, 'brand'), get(r, ar.idx, 'category')) || '']);
     const storeId = get(r, ar.idx, 'storeId');
     const city = (storeMeta.get(storeId) || {}).city || get(r, ar.idx, 'storeLocation') || 'Unknown';
     const meta = storeMeta.get(storeId) || {};
@@ -547,7 +551,7 @@ function main() {
       }
     }
   }
-  console.log(`  ${ar.rows.length - arSkippedDupe} response rows across ${paramStats.size} mapped parameters (${arSkippedDupe} skipped, tied to a superseded resubmission)`);
+  console.log(`  ${ar.rows.length - arSkippedDupe} response rows across ${paramStats.size} mapped parameters (${arSkippedDupe} skipped, tied to a superseded resubmission), ${responseTriples.length} triples emitted`);
 
   // ---------- Cadence: daily / weekly / monthly distinct PODs audited ----------
   const dailyMap = new Map(); // date -> {pods:Set, audits}
@@ -792,7 +796,7 @@ function main() {
     audits,
     capa,
     cadence: { daily, weekly, monthly, today, thisWeek, thisMonth },
-    categoryStats: { parameters },
+    categoryStats: { parameters, responses: responseTriples },
     categoryCompliance,
     categoryDrilldown: categoryDrilldownOut,
     cityRollup,

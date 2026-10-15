@@ -54,12 +54,54 @@
   }
 
   // ---------------- filtered views ----------------
+  // When "Latest audit" mode is on, parameter stats can't come from the precomputed
+  // aggregates (they cover ALL audits) — they are recomputed from the per-response
+  // triples (D.categoryStats.responses) restricted to the kept latest audits.
+  var latestParamStats = null; // paramKey -> byPod array, or null in all-audits mode
+  var latestParamStatsByCat = null; // category -> paramKey -> byPod array
+  function computeLatestParamStats(audits){
+    var latestIds = new Set(audits.map(function(a){ return a.id; }));
+    var auditById = {}; audits.forEach(function(a){ auditById[a.id] = a; });
+    var byParam = {};       // all categories combined
+    var byParamByCat = {};  // per category
+    (D.categoryStats.responses || []).forEach(function(t){
+      var a = auditById[t[0]];
+      if (!a) return;
+      function entry(m){
+        var mm = m[t[1]] || (m[t[1]] = {});
+        var e = mm[a.storeId];
+        if (!e) e = mm[a.storeId] = { storeId:a.storeId, storeName:a.storeName, city:a.city, cluster:a.cluster, total:0, nc:0, partial:0 };
+        return e;
+      }
+      var e = entry(byParam);
+      e.total++;
+      if (t[2] === 'Non Compliance') e.nc++;
+      else if (t[2] === 'Partially Complied') e.partial++;
+      if (t[3]){
+        var ec = entry(byParamByCat[t[3]] || (byParamByCat[t[3]] = {}));
+        ec.total++;
+        if (t[2] === 'Non Compliance') ec.nc++;
+        else if (t[2] === 'Partially Complied') ec.partial++;
+      }
+    });
+    function toOut(m){
+      var out = {};
+      Object.keys(m).forEach(function(k){ out[k] = Object.keys(m[k]).map(function(pk){ return m[k][pk]; }); });
+      return out;
+    }
+    latestParamStats = toOut(byParam);
+    latestParamStatsByCat = {};
+    Object.keys(byParamByCat).forEach(function(c){ latestParamStatsByCat[c] = toOut(byParamByCat[c]); });
+  }
   function computeFiltered(){
     var audits = D.audits.filter(function(a){ return cityOk(a.city) && podOk(a.storeId) && clusterOk(a.cluster) && within(a.date); });
     if (state.latestOnly){
       var latestByStore = {};
       audits.forEach(function(a){ if (!latestByStore[a.storeId] || a.date > latestByStore[a.storeId].date) latestByStore[a.storeId] = a; });
       audits = Object.keys(latestByStore).map(function(k){ return latestByStore[k]; });
+      latestParamStats = computeLatestParamStats(audits);
+    } else {
+      latestParamStats = null;
     }
     var capa = D.capa.filter(function(c){ return cityOk(c.city) && podOk(c.storeId) && clusterOk(c.cluster) && within(c.auditDate); });
     var drilldown = {};
@@ -120,8 +162,17 @@
     'AC Room-Temp':'AC room temp — non-compliant PODs',
     'Inward-Temp':'Inward temp record — non-compliant PODs'
   };
-  function zoneStoreSource(p){
-    var src = p.byPod;
+  function zoneStoreSource(p, cat){
+    var src;
+    if (latestParamStats){
+      // Latest-audit mode: stats were recomputed per response triple. Use the
+      // category-scoped set when a category tab is active (FNV/Noice/DBEM) —
+      // the precomputed per-category aggregates can't be reused here.
+      var scoped = cat ? (latestParamStatsByCat[cat] || {})[p.key] : latestParamStats[p.key];
+      src = scoped || [];
+    } else {
+      src = p.byPod;
+    }
     if (state.pods) src = src.filter(function(x){ return state.pods.has(x.storeId); });
     if (state.cities) src = src.filter(function(x){ return state.cities.has(x.city); });
     if (state.clusters) src = src.filter(function(x){ return x.cluster && state.clusters.has(x.cluster); });
@@ -131,7 +182,7 @@
     return ZONE_KPI_ORDER.map(function(key){
       var p = D.categoryStats.parameters.find(function(x){ return x.key===key; });
       if (!p) return null;
-      var ncStores = zoneStoreSource(p).filter(function(x){ return x.nc>0; }).length;
+      var ncStores = zoneStoreSource(p, null).filter(function(x){ return x.nc>0; }).length;
       return { key:'zone-'+key, value:fmt(ncStores), label:ZONE_KPI_LABEL[key] };
     }).filter(Boolean);
   }
@@ -181,7 +232,7 @@
       var p = catParams.find(function(x){ return x.key===key; });
       if (!p) return null;
       var label = (ov && ov.labels && ov.labels[key]) || ZONE_KPI_LABEL[key];
-      var ncStores = zoneStoreSource(p).filter(function(x){ return x.nc>0; }).length;
+      var ncStores = zoneStoreSource(p, cat).filter(function(x){ return x.nc>0; }).length;
       return { key:cat+'-'+key, value:fmt(ncStores), label:label };
     }).filter(Boolean);
   }
@@ -420,8 +471,8 @@
   // classification used by zoneNonCompliantCards/categoryNonCompliantCards and by
   // the table's own expand-list (bucketRows), so the summary row always matches
   // both the KPI cards above and the drill-down list underneath it.
-  function paramPodCounts(param){
-    var source = zoneStoreSource(param);
+  function paramPodCounts(param, cat){
+    var source = zoneStoreSource(param, cat);
     var nc=0, partial=0, fully=0;
     source.forEach(function(x){
       if (x.nc>0) nc++;
@@ -476,7 +527,7 @@
         });
       }
       params.forEach(function(p){
-        var c = paramPodCounts(p);
+        var c = paramPodCounts(p, cat);
         var display = (ov && ov.displayNames && ov.displayNames[p.key]) || p.short;
         rows.push({ p:p, display:display, category:cat, fully:c.compliant, partial:c.partial, nc:c.nc, total:c.total });
       });
@@ -491,7 +542,7 @@
     var expandedKey = null, expandedBucket = 'nc';
 
     function bucketRows(r, bucket){
-      var source = zoneStoreSource(r.p);
+      var source = zoneStoreSource(r.p, r.category);
       return source.filter(function(x){
         if (bucket==='nc') return x.nc>0;
         if (bucket==='partial') return x.nc===0 && x.partial>0;

@@ -142,11 +142,12 @@
   // how they are labelled (business-requested naming for the FNV tab, 2026-10-15).
   var CATEGORY_ZONE_OVERRIDES = {
     FNV: {
-      order: ['Expiry-Removal','Chiller-Temp','Stacking'],
+      order: ['Expiry-Removal','Chiller-Temp','Stacking','Zone temp'],
       labels: {
         'Expiry-Removal': 'Spoilage/Defect removal — non-compliant PODs',
         'Chiller-Temp': 'Chiller temp — non-compliant PODs',
-        'Stacking': 'Overloading in shelves — number of PODs'
+        'Stacking': 'Overloading in shelves — number of PODs',
+        'Zone temp': 'AC room temperature — non-compliant PODs'
       }
     }
   };

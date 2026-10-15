@@ -138,13 +138,28 @@
 
   // Same "non-compliant PODs" cards, scoped to one business category (FNV/Noice/DBEM) —
   // only the headline params that actually apply to that category get a card.
+  // Per-category overrides for the KPI row: which headline params get a card and
+  // how they are labelled (business-requested naming for the FNV tab, 2026-10-15).
+  var CATEGORY_ZONE_OVERRIDES = {
+    FNV: {
+      order: ['Expiry-Removal','Chiller-Temp','Stacking'],
+      labels: {
+        'Expiry-Removal': 'Spoilage/Defect removal — non-compliant PODs',
+        'Chiller-Temp': 'Chiller temp — non-compliant PODs',
+        'Stacking': 'Overloading of shelves — non-compliant PODs'
+      }
+    }
+  };
   function categoryNonCompliantCards(cat){
     var catParams = D.categoryCompliance[cat] || [];
-    return ZONE_KPI_ORDER.map(function(key){
+    var ov = CATEGORY_ZONE_OVERRIDES[cat];
+    var order = ov ? ov.order : ZONE_KPI_ORDER;
+    return order.map(function(key){
       var p = catParams.find(function(x){ return x.key===key; });
       if (!p) return null;
+      var label = (ov && ov.labels && ov.labels[key]) || ZONE_KPI_LABEL[key];
       var ncStores = zoneStoreSource(p).filter(function(x){ return x.nc>0; }).length;
-      return { key:cat+'-'+key, value:fmt(ncStores), label:ZONE_KPI_LABEL[key] };
+      return { key:cat+'-'+key, value:fmt(ncStores), label:label };
     }).filter(Boolean);
   }
 

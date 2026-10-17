@@ -1139,5 +1139,5 @@
     refreshAll();
   }
 
-  global.Dashboard = { init:init, refreshAll:refreshAll, state:state, openModal:openModal, closeModal:closeModal, esc:esc, computeFiltered:computeFiltered, zoneCards:zoneNonCompliantCards, categoryCards:categoryNonCompliantCards, categoryTabs:CATEGORY_TABS, openStoreReport:openStoreReportModal, openCapaList:openCapaListModal, avgCategoryScore:avgCategoryScore };
+  global.Dashboard = { init:init, refreshAll:refreshAll, state:state, openModal:openModal, closeModal:closeModal, esc:esc, computeFiltered:computeFiltered, zoneCards:zoneNonCompliantCards, categoryCards:categoryNonCompliantCards, categoryTabs:CATEGORY_TABS, openStoreReport:openStoreReportModal, openCapaList:openCapaListModal, avgCategoryScore:avgCategoryScore, zonePodScoresForPies:function(){ return zonePodScores(state.categoryTab || 'exec'); } };
 })(window);

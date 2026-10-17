@@ -96,6 +96,18 @@
           <div class="section-sub" id="podZonesSubtitle"></div>
         </div>
       </div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px" id="execPies">
+        <div class="card">
+          <div class="section-title" style="font-size:14px">Zone distribution</div>
+          <div class="section-sub">Green 80–100% · Yellow 60–80% · Red &lt;60% (latest audit per POD)</div>
+          <div id="zonePie"></div>
+        </div>
+        <div class="card">
+          <div class="section-title" style="font-size:14px">Store CAPA status</div>
+          <div class="section-sub">Open includes In Progress · whole dashboard</div>
+          <div id="capaPie"></div>
+        </div>
+      </div>
       <div id="podZones"></div>
     </div>
 
@@ -558,11 +570,50 @@
     document.getElementById('capaBreakdownSubtitle').textContent = 'Which '+(byCluster?'clusters':'cities')+' and PODs still have CAPA not closed ('+scope+'). Click a '+(byCluster?'cluster':'city')+' to expand its POD list; click "View report" on any POD for its full CAPA history (text only, no photos).';
   }
 
+  // ---------------- Executive summary pies: zone distribution + store CAPA status ----------------
+  function renderExecPies(f){
+    var zoneEl = document.getElementById('zonePie');
+    var capaEl = document.getElementById('capaPie');
+    if (zoneEl){
+      // same buckets as the POD zones table below (renderPodZones) — zone % per POD
+      var counts = { g:0, y:0, r:0 };
+      var pods = Dashboard.zonePodScoresForPies ? Dashboard.zonePodScoresForPies() : [];
+      pods.forEach(function(p){ counts[p.score >= 80 ? 'g' : p.score >= 60 ? 'y' : 'r']++; });
+      Charts.donut(zoneEl, {
+        size:190, thickness:64, centerValue:Charts.fmt(pods.length), centerLabel:'PODs',
+        segments:[
+          { label:'Green zone (80–100%)', value:counts.g, color:'var(--good)' },
+          { label:'Yellow zone (60–80%)', value:counts.y, color:'var(--warn)' },
+          { label:'Red zone (<60%)', value:counts.r, color:'var(--bad)' },
+        ]
+      });
+    }
+    if (capaEl){
+      // whole dashboard: store-level CAPA status — Open counts Open + In Progress
+      var byStore = {};
+      D.capa.forEach(function(c){ (byStore[c.storeId] = byStore[c.storeId] || []).push(c); });
+      var open = 0, closed = 0;
+      Object.keys(byStore).forEach(function(k){
+        var tasks = byStore[k];
+        if (tasks.every(function(t){ return t.status === 'Closed'; })) closed++;
+        else open++;
+      });
+      Charts.donut(capaEl, {
+        size:190, thickness:64, centerValue:Charts.fmt(open + closed), centerLabel:'Stores',
+        segments:[
+          { label:'Open (incl. In Progress)', value:open, color:'var(--warn)' },
+          { label:'Closed', value:closed, color:'var(--good)' },
+        ]
+      });
+    }
+  }
+
   window.onDashboardRefresh = function(f){
     renderOverviewKpis(f);
     renderCapaKpis(f);
     renderCapaCoverage(f);
     renderCapaBreakdown(f);
+    renderExecPies(f);
     syncAllFilterUI();
     refreshDateStatusText();
   };

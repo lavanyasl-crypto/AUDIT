@@ -24,7 +24,6 @@
   </div>
   <div class="tabbar" id="tabbar">
     <button class="tab-btn active" data-tab="overview"></button>
-    <button class="tab-btn" data-tab="capa"></button>
   </div>
 </div>
 
@@ -69,6 +68,7 @@
           <button type="button" class="seg-btn" data-cat="FNV">FNV</button>
           <button type="button" class="seg-btn" data-cat="Noice">NOICE</button>
           <button type="button" class="seg-btn" data-cat="DBEM">DBEM</button>
+          <button type="button" class="seg-btn" data-cat="capa">CAPA</button>
         </div>
         <div id="execScopeNote" class="section-sub" style="display:none;margin:-4px 0 10px;font-weight:600;color:var(--accent-ink)">PAN India</div>
         <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">
@@ -157,6 +157,7 @@
           <button type="button" class="seg-btn" data-cat="FNV">FNV</button>
           <button type="button" class="seg-btn" data-cat="Noice">NOICE</button>
           <button type="button" class="seg-btn" data-cat="DBEM">DBEM</button>
+          <button type="button" class="seg-btn" data-cat="capa">CAPA</button>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">
           <div class="seg" id="geoSegCapa">
@@ -173,27 +174,6 @@
       <div class="section-sub" id="capaKpiSubtitle" style="margin-bottom:10px"></div>
       <div class="grid kpi-grid" id="capaKpiGrid"></div>
 
-      <div class="card" style="margin-top:16px">
-        <div class="card-title">Audit → CAPA coverage</div>
-        <div class="section-sub" id="capaCoverageSubtitle"></div>
-        <div id="capaCoverage"></div>
-      </div>
-
-      <div class="two-col" style="margin-top:16px">
-        <div class="card"><div class="card-title">Store CAPA status</div><div id="capaDonut"></div></div>
-        <div class="card"><div class="card-title">Fixed on time vs late vs overdue</div><div id="slaDonut"></div></div>
-      </div>
-      <div class="card" style="margin-top:16px">
-        <div class="card-title">Overdue stores by city (top 14)</div>
-        <div id="slaCityBar"></div>
-        <div class="chart-legend">
-          <div class="li"><span class="sw" style="background:var(--bad)"></span>Overdue</div>
-          <div class="li"><span class="sw" style="background:var(--warn)"></span>Closed late</div>
-          <div class="li"><span class="sw" style="background:var(--good)"></span>Closed on time</div>
-          <div class="li"><span class="sw" style="background:var(--info)"></span>Other (still within the 3-day window)</div>
-        </div>
-      </div>
-
       <div class="section" id="sec-capa-breakdown">
         <div class="section-head">
           <div>
@@ -202,11 +182,6 @@
           </div>
         </div>
         <div class="card"><div id="capaBreakdown"></div></div>
-      </div>
-
-      <div class="card" style="margin-top:16px">
-        <div class="card-title">CAPA by city and store — click a row for the checkpoint list, or "View report" for a summary</div>
-        <div id="capaOverdueTable"></div>
       </div>
     </div>
   </div>
@@ -227,7 +202,7 @@
   var D = window.DASHBOARD_DATA;
   document.getElementById('footMeta').textContent = 'Generated ' + new Date(D.meta.generatedAt).toLocaleString() + ' · sources: ' + D.meta.dataSources.used.join(', ');
 
-  // ---------------- top-level tabs: POD Audits / CAPA ----------------
+  // ---------------- top-level tab: POD Audits (CAPA now lives in the category strip) ----------------
   var TABS = [
     { key:'overview', label:'POD Audits', ic:'clipboard' },
     { key:'capa', label:'CAPA', ic:'shield-check' },
@@ -292,19 +267,26 @@
     Dashboard.refreshAll();
   });
 
-  // ---------------- Executive Summary / FNV / NOICE / DBEM sub-tabs (POD Audits strip has a 5th "CAPA" button that jumps tab) ----------------
+  // ---------------- Executive Summary / FNV / NOICE / DBEM / CAPA sub-tabs (CAPA shows the CAPA panel) ----------------
   [categoryTabSeg, categoryTabSegCapa].forEach(function(seg){
     if (!seg) return;
     seg.addEventListener('click', function(e){
       var btn = e.target.closest('.seg-btn'); if (!btn) return;
       var cat = btn.getAttribute('data-cat');
       if (cat === 'capa'){
-        document.querySelector('#tabbar .tab-btn[data-tab="capa"]').click();
+        // CAPA view: activate the capa panel and highlight this strip
+        document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+        document.querySelector('.tab-panel[data-panel="capa"]').classList.add('active');
+        document.querySelectorAll('.seg-btn[data-cat="capa"]').forEach(function(b){ b.classList.add('active'); });
+        window.scrollTo(0, 0);
         return;
       }
       Dashboard.state.categoryTab = cat;
       // Executive Summary is PAN-India-only — drop any city/cluster selection
       if (cat === 'exec'){ Dashboard.state.cities = null; Dashboard.state.clusters = null; Dashboard.state.geoMode = 'pan'; }
+      // coming back from CAPA: make sure the overview panel is visible again
+      document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+      document.querySelector('.tab-panel[data-panel="overview"]').classList.add('active');
       Dashboard.refreshAll();
     });
   });
@@ -452,8 +434,6 @@
       { key:'cs-open', value:auditsOpen.toLocaleString(), label:'Audits — CAPA open' },
       { key:'cs-closed', value:auditsClosed.toLocaleString(), label:'Audits — CAPA closed' },
       { key:'cs-closed-pct', value:auditClosedPct+'%', label:'Audits CAPA closed (%)' },
-      { key:'cs-audits-capa', value:auditsWithCapa.toLocaleString()+' / '+auditsWithFindings.toLocaleString(), label:'Audits with CAPA shared' },
-      { key:'cs-audits-rate', value:capaSharePct+'%', label:'CAPA shared rate (%)' },
     ];
     el.innerHTML = cards.map(function(c){ return Charts.kpiCard({ key:c.key, value:c.value, label:c.label }); }).join('');
     var cat = Dashboard.state.categoryTab || 'exec';

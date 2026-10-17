@@ -71,6 +71,7 @@
           <button type="button" class="seg-btn" data-cat="DBEM">DBEM</button>
           <button type="button" class="seg-btn" data-cat="capa">CAPA</button>
         </div>
+        <div id="execScopeNote" class="section-sub" style="display:none;margin:-4px 0 10px;font-weight:600;color:var(--accent-ink)">PAN India</div>
         <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">
           <div class="seg" id="geoSeg">
             <button type="button" class="seg-btn active" data-geo="pan">PAN India</button>
@@ -355,6 +356,7 @@
       });
     });
     [geoSeg, geoSegCapa].forEach(function(seg){ if (seg) seg.style.display = execPanOnly ? 'none' : ''; });
+    var scopeNote = document.getElementById('execScopeNote'); if (scopeNote) scopeNote.style.display = execPanOnly ? '' : 'none';
     [document.getElementById('podSel'), document.getElementById('podSelCapa'), document.getElementById('citySel'), document.getElementById('citySelCapa'), document.getElementById('clusterSelCapa')].forEach(function(el){ if (el) el.style.display = execPanOnly ? 'none' : ''; });
     [categoryTabSeg, categoryTabSegCapa].forEach(function(seg){ if (!seg) return; seg.querySelectorAll('.seg-btn').forEach(function(b){ var c = b.getAttribute('data-cat'); if (c!=='capa') b.classList.toggle('active', c===s.categoryTab); }); });
   }

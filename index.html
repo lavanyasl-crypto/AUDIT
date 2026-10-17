@@ -83,6 +83,19 @@
 
       <div class="grid kpi-grid" id="ovKpiGrid"></div>
 
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:22px" id="execPies">
+        <div class="card">
+          <div class="section-title" style="font-size:14px">Zone distribution</div>
+          <div class="section-sub">Green 80–100% · Yellow 60–80% · Red &lt;60% (latest audit per POD)</div>
+          <div id="zonePie"></div>
+        </div>
+        <div class="card">
+          <div class="section-title" style="font-size:14px">Store CAPA status</div>
+          <div class="section-sub">Open includes In Progress · whole dashboard</div>
+          <div id="capaPie"></div>
+        </div>
+      </div>
+
       <div class="seg" id="ovSubTabSeg" style="margin-top:22px">
         <button type="button" class="seg-btn active" data-sub="zones">POD Zones</button>
         <button type="button" class="seg-btn" data-sub="compliance">Categorywise &amp; parameterwise compliance</button>
@@ -94,18 +107,6 @@
         <div>
           <div class="section-title">POD Zones</div>
           <div class="section-sub" id="podZonesSubtitle"></div>
-        </div>
-      </div>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px" id="execPies">
-        <div class="card">
-          <div class="section-title" style="font-size:14px">Zone distribution</div>
-          <div class="section-sub">Green 80–100% · Yellow 60–80% · Red &lt;60% (latest audit per POD)</div>
-          <div id="zonePie"></div>
-        </div>
-        <div class="card">
-          <div class="section-title" style="font-size:14px">Store CAPA status</div>
-          <div class="section-sub">Open includes In Progress · whole dashboard</div>
-          <div id="capaPie"></div>
         </div>
       </div>
       <div id="podZones"></div>

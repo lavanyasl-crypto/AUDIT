@@ -394,8 +394,8 @@
     document.getElementById('ovSubtitle').textContent = storesAudited.toLocaleString() + ' stores audited. Scoring: 0 = Non-Compliance, 1 = Partial Compliance, 2 = Full Compliance, per the SCORING (0-1-2) column.';
     var scope = Dashboard.state.clusters ? Array.from(Dashboard.state.clusters).join(', ') : (Dashboard.state.cities ? Array.from(Dashboard.state.cities).join(', ') : 'PAN India');
     var catLabel = CATEGORY_TITLES[cat] || cat;
-    document.getElementById('catSectionTitle').textContent = (cat === 'exec' ? 'Categorywise' : catLabel + ' —') + ' parameterwise compliance';
-    document.getElementById('catSubtitle').textContent = 'Number of stores Fully compliant, Partially compliant, and Non compliant per ' + (cat === 'exec' ? 'category and ' : '') + 'checklist parameter (' + scope + '). Click a Parameter to expand the City & Store list; click a count to view just that bucket.';
+    var catTitleEl = document.getElementById('catSectionTitle'); if (catTitleEl) catTitleEl.textContent = (cat === 'exec' ? 'Categorywise' : catLabel + ' —') + ' parameterwise compliance';
+    var catSubEl = document.getElementById('catSubtitle'); if (catSubEl) catSubEl.textContent = 'Number of stores Fully compliant, Partially compliant, and Non compliant per ' + (cat === 'exec' ? 'category and ' : '') + 'checklist parameter (' + scope + '). Click a Parameter to expand the City & Store list; click a count to view just that bucket.';
   }
 
   // ---------------- CAPA tab: category-scoped KPI cards + city→POD closure breakdown ----------------

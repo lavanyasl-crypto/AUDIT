@@ -274,13 +274,15 @@
       var btn = e.target.closest('.seg-btn'); if (!btn) return;
       var cat = btn.getAttribute('data-cat');
       if (cat === 'capa'){
-        // CAPA view: activate the capa panel and highlight this strip
+        // CAPA view: activate the capa panel; syncAllFilterUI owns strip highlighting
+        Dashboard.state.view = 'capa';
         document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
         document.querySelector('.tab-panel[data-panel="capa"]').classList.add('active');
-        document.querySelectorAll('.seg-btn[data-cat="capa"]').forEach(function(b){ b.classList.add('active'); });
+        syncAllFilterUI();
         window.scrollTo(0, 0);
         return;
       }
+      Dashboard.state.view = 'overview';
       Dashboard.state.categoryTab = cat;
       // Executive Summary is PAN-India-only — drop any city/cluster selection
       if (cat === 'exec'){ Dashboard.state.cities = null; Dashboard.state.clusters = null; Dashboard.state.geoMode = 'pan'; }
@@ -338,8 +340,11 @@
     });
     [geoSeg, geoSegCapa].forEach(function(seg){ if (seg) seg.style.display = execPanOnly ? 'none' : ''; });
     var scopeNote = document.getElementById('execScopeNote'); if (scopeNote) scopeNote.style.display = execPanOnly ? '' : 'none';
-    [document.getElementById('podSel'), document.getElementById('podSelCapa'), document.getElementById('citySel'), document.getElementById('citySelCapa'), document.getElementById('clusterSelCapa')].forEach(function(el){ if (el) el.style.display = execPanOnly ? 'none' : ''; });
-    [categoryTabSeg, categoryTabSegCapa].forEach(function(seg){ if (!seg) return; seg.querySelectorAll('.seg-btn').forEach(function(b){ var c = b.getAttribute('data-cat'); if (c!=='capa') b.classList.toggle('active', c===s.categoryTab); }); });
+    // dropdowns: hidden outright on exec (PAN-India-only); otherwise follow the geo mode
+    [document.getElementById('citySel'), document.getElementById('citySelCapa')].forEach(function(el){ if (el){ el.style.display = execPanOnly ? 'none' : ''; el.classList.toggle('hidden', execPanOnly || mode!=='city'); } });
+    [document.getElementById('clusterSelCapa')].forEach(function(el){ if (el){ el.style.display = execPanOnly ? 'none' : ''; el.classList.toggle('hidden', execPanOnly || mode!=='cluster'); } });
+    [document.getElementById('podSel'), document.getElementById('podSelCapa')].forEach(function(el){ if (el) el.style.display = execPanOnly ? 'none' : ''; });
+    [categoryTabSeg, categoryTabSegCapa].forEach(function(seg){ if (!seg) return; seg.querySelectorAll('.seg-btn').forEach(function(b){ var c = b.getAttribute('data-cat'); b.classList.toggle('active', s.view === 'capa' ? c==='capa' : c===s.categoryTab && c!=='capa'); }); });
   }
 
   // Reset also puts the date-preset / recency / geography / category controls back to defaults
@@ -353,6 +358,7 @@
     Dashboard.state.datePresetCustom = false;
     Dashboard.state.latestOnly = false;
     Dashboard.state.categoryTab = 'exec';
+    Dashboard.state.view = 'overview';
     document.querySelectorAll('#auditRecencySeg .seg-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-recency')==='latest'); });
     Dashboard.refreshAll();
   }

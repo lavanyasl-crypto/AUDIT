@@ -395,7 +395,6 @@
             return '<span class="badge warn">Open</span>';
           } },
           { key:'overdue', label:'Overdue (past 3-day deadline)', render:function(r){ return r.overdue ? '<span class="badge bad">'+r.overdue+'</span>' : '—'; } },
-          { key:'closedLate', label:'Closed late', render:function(r){ return r.closedLate ? '<span class="badge warn">'+r.closedLate+'</span>' : '—'; } },
           { key:'lastAuditDate', label:'Last audit' },
         ],
         rows: storeRows, pageSize: 10, searchable: true,

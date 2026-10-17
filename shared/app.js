@@ -399,6 +399,7 @@
           { key:'lastAuditDate', label:'Last audit' },
         ],
         rows: storeRows, pageSize: 10, searchable: true,
+        csvName:'capa-by-city-store.csv',
         onRowClick: function(r){ openCapaListModal(r.city+' — '+r.storeName, f.capa.filter(function(c){ return c.storeId===r.storeId; })); },
         onViewReport: function(r){ openStoreReportModal(r.storeId); }
       });
@@ -616,11 +617,24 @@
     rows.forEach(function(r){
       lines.push([r.category, r.p.short, r.fully, r.partial, r.nc].map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','));
     });
-    var blob = new Blob([lines.join('\n')], { type:'text/csv;charset=utf-8;' });
+    downloadTextFile('category-parameter-compliance.csv', lines.join('\n'));
+  }
+
+  function downloadTextFile(filename, text){
+    var blob = new Blob([text], { type:'text/csv;charset=utf-8;' });
     var url = URL.createObjectURL(blob);
-    var a = document.createElement('a'); a.href = url; a.download = 'category-parameter-compliance.csv';
+    var a = document.createElement('a'); a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  // CSV rows -> text. Cells quoted only when needed (comma/quote/newline).
+  function toCsvText(header, rows){
+    function cell(v){
+      var s = v === undefined || v === null ? '' : String(v);
+      return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+    }
+    return [header.map(cell).join(',')].concat(rows.map(function(r){ return r.map(cell).join(','); })).join('\r\n');
   }
 
   function findingsListHtml(rows){
@@ -787,6 +801,7 @@
           { key:'capaClosed', label:'CAPA closed' },
         ],
         rows: rows, pageSize: 12, searchable:true, defaultSort:{key:'capaOverdue', dir:'desc'},
+        csvName:'city-rollup.csv',
         onRowClick: function(r){ openCityModal(r); }
       });
     }
@@ -804,6 +819,7 @@
           { key:'capaClosed', label:'CAPA closed' },
         ],
         rows: prows, pageSize: 12, searchable:true, defaultSort:{key:'capaOverdue', dir:'desc'},
+        csvName:'pod-rollup.csv',
         onRowClick: function(r){ openPodModal(r); },
         onViewReport: function(r){ openStoreReportModal(r.storeId); }
       });
@@ -887,7 +903,7 @@
           { key:'remark', label:'Remark', wide:true },
           { key:'photoUrl', label:'Evidence', render:function(r){ return r.photoUrl ? '<a class="photo-link" href="'+esc(r.photoUrl)+'" target="_blank">'+icon('image',{size:11})+'View</a>' : '—'; } },
         ],
-        rows: f.skuExpired, pageSize: 10, searchable:true
+        rows: f.skuExpired, pageSize: 10, searchable:true, csvName:'expired-sku-findings.csv'
       });
     }
   }
@@ -965,9 +981,13 @@
         '</tr>';
       }).join('') : ('<tr><td colspan="'+colCount+'"><div class="empty-state">No matching rows.</div></td></tr>');
       el.innerHTML =
-        (opts.searchable ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;flex-wrap:wrap;gap:8px">'+
-          '<div class="search-box">'+icon('search',{size:14})+'<input type="text" placeholder="Search this table…" value="'+esc(search)+'"/></div>'+
-          '<div class="section-sub">'+fmt(rows.length)+' rows</div></div>' : '')+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;flex-wrap:wrap;gap:8px">'+
+          (opts.searchable ? '<div class="search-box">'+icon('search',{size:14})+'<input type="text" placeholder="Search this table…" value="'+esc(search)+'"/></div>' : '<div></div>')+
+          '<div style="display:flex;align-items:center;gap:10px">'+
+            '<div class="section-sub">'+fmt(rows.length)+' rows</div>'+
+            '<button type="button" class="reset-btn" data-csv-btn>Download CSV</button>'+
+          '</div>'+
+        '</div>'+
         '<div class="table-wrap"><table class="datatable"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'+
         '<div class="pager"><span>Page '+(page+1)+' of '+totalPages+'</span><span><button data-act="prev" '+(page===0?'disabled':'')+'>‹ Prev</button> <button data-act="next" '+(page>=totalPages-1?'disabled':'')+'>Next ›</button></span></div>';
       el.querySelectorAll('thead th').forEach(function(th){
@@ -979,6 +999,14 @@
       });
       var input = el.querySelector('.search-box input');
       if (input) input.addEventListener('input', function(){ search = input.value; page = 0; draw(); });
+      var csvBtn = el.querySelector('[data-csv-btn]');
+      if (csvBtn) csvBtn.addEventListener('click', function(){
+        var cols = opts.columns.filter(function(c){ return !c.render || c.csv !== false; });
+        downloadTextFile(opts.csvName || 'table-export.csv', toCsvText(
+          cols.map(function(c){ return c.label; }),
+          rows.map(function(r){ return cols.map(function(c){ return r[c.key]; }); })
+        ));
+      });
       var pv = el.querySelector('[data-act="prev"]'); if (pv) pv.addEventListener('click', function(){ page--; draw(); });
       var nx = el.querySelector('[data-act="next"]'); if (nx) nx.addEventListener('click', function(){ page++; draw(); });
       if (opts.onRowClick){

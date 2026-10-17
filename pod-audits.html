@@ -526,7 +526,8 @@
         }).join('')+'</div>';
     }
     function draw(){
-      el.innerHTML = '<div class="table-wrap"><table class="datatable compliance-table"><thead><tr>'+
+      el.innerHTML = '<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="reset-btn" id="capaBreakdownCsvBtn">Download CSV</button></div>'+
+        '<div class="table-wrap"><table class="datatable compliance-table"><thead><tr>'+
           '<th>'+groupLabel+'</th><th style="text-align:right">Stores with CAPA</th><th style="text-align:right">Not closed</th><th style="text-align:right">In progress</th><th style="text-align:right">Closed</th>'+
         '</tr></thead><tbody>'+
         groupRows.map(function(cr,i){
@@ -550,6 +551,16 @@
       });
       el.querySelectorAll('[data-report]').forEach(function(btn){
         btn.addEventListener('click', function(e){ e.stopPropagation(); Dashboard.openStoreReport(btn.getAttribute('data-report')); });
+      });
+      var csvBtn = document.getElementById('capaBreakdownCsvBtn');
+      if (csvBtn) csvBtn.addEventListener('click', function(){
+        var header = [groupLabel,'Stores with CAPA','Not closed','In progress','Closed'];
+        var rows = groupRows.map(function(cr){ return [cr.name, cr.total, cr.open, cr.progress, cr.closed]; });
+        var blob = new Blob([header.map(function(v){ return '"'+String(v)+'"'; }).join(',') + '\r\n' + rows.map(function(r){ return r.map(function(v){ return '"'+String(v)+'"'; }).join(','); }).join('\r\n')], { type:'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a'); a.href = url; a.download = (byCluster?'cluster-wise':'city-wise')+'-capa-closure-detail.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       });
     }
     draw();

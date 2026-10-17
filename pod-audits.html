@@ -171,8 +171,7 @@
         </div>
       </div>
 
-      <div class="section-sub" id="capaKpiSubtitle" style="margin-bottom:10px"></div>
-      <div class="grid kpi-grid" id="capaKpiGrid"></div>
+      <div class="grid kpi-grid" id="capaKpiGrid" style="margin-top:18px"></div>
 
       <div class="section" id="sec-capa-breakdown">
         <div class="section-head">
@@ -444,7 +443,7 @@
     el.innerHTML = cards.map(function(c){ return Charts.kpiCard({ key:c.key, value:c.value, label:c.label }); }).join('');
     var cat = Dashboard.state.categoryTab || 'exec';
     var scope = Dashboard.state.clusters ? Array.from(Dashboard.state.clusters).join(', ') : (Dashboard.state.cities ? Array.from(Dashboard.state.cities).join(', ') : 'PAN India');
-    document.getElementById('capaKpiSubtitle').textContent = (CATEGORY_TITLES[cat]||cat) + ', ' + scope;
+    var subEl = document.getElementById('capaKpiSubtitle'); if (subEl) subEl.textContent = (CATEGORY_TITLES[cat]||cat) + ', ' + scope;
   }
 
   function renderCapaCoverage(f){

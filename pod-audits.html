@@ -56,8 +56,8 @@
           <button class="reset-btn" id="resetFiltersBtn"></button>
           <span id="dateStatusText" style="font-size:12.5px;color:var(--text-faint)"></span>
           <div class="seg" id="auditRecencySeg" style="margin-left:auto">
-            <button type="button" class="seg-btn active" data-recency="all">All audits</button>
-            <button type="button" class="seg-btn" data-recency="latest">Latest audit</button>
+            <button type="button" class="seg-btn" data-recency="all">All audits</button>
+            <button type="button" class="seg-btn active" data-recency="latest">Latest audit</button>
           </div>
         </div>
         <div class="active-tags" id="activeTags" style="margin-top:10px"></div>
@@ -82,16 +82,31 @@
       </div>
 
       <div class="grid kpi-grid" id="ovKpiGrid"></div>
+
+      <div class="seg" id="ovSubTabSeg" style="margin-top:22px">
+        <button type="button" class="seg-btn active" data-sub="zones">POD Zones</button>
+        <button type="button" class="seg-btn" data-sub="compliance">Categorywise &amp; parameterwise compliance</button>
+      </div>
     </div>
 
-    <div class="section" id="sec-category">
+    <div class="section" id="sec-pod-zones" data-ovsub="zones">
       <div class="section-head">
         <div>
-          <div class="section-title" id="catSectionTitle">Categorywise &amp; parameterwise compliance</div>
-          <div class="section-sub" id="catSubtitle"></div>
+          <div class="section-title">POD Zones</div>
+          <div class="section-sub" id="podZonesSubtitle"></div>
         </div>
       </div>
-      <div class="card"><div id="complianceTable"></div></div>
+      <div id="podZones"></div>
+    </div>
+
+    <div class="section" id="sec-category" data-ovsub="compliance" style="display:none">
+      <div class="section-head">
+        <div>
+          <div class="section-title">Categorywise &amp; parameterwise compliance</div>
+          <div class="section-sub">POD counts per compliance bucket for each checklist parameter. Click a count to switch the bucket shown in the drill-down list; click a store for its findings. Category tabs above scope the table.</div>
+        </div>
+      </div>
+      <div id="complianceTable"></div>
     </div>
 
   </div>
@@ -246,6 +261,15 @@
     var elCapa = document.getElementById('dateStatusTextCapa'); if (elCapa) elCapa.textContent = txt;
   }
 
+  // ---------------- POD Audits sub-tabs: Categorywise compliance / POD Zones ----------------
+  document.getElementById('ovSubTabSeg').addEventListener('click', function(e){
+    var btn = e.target.closest('.seg-btn'); if (!btn) return;
+    this.querySelectorAll('.seg-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    var sub = btn.getAttribute('data-sub');
+    document.querySelectorAll('[data-ovsub]').forEach(function(sec){ sec.style.display = (sec.getAttribute('data-ovsub') === sub) ? '' : 'none'; });
+  });
+
   // ---------------- All audits / Latest audit per store ----------------
   document.getElementById('auditRecencySeg').addEventListener('click', function(e){
     var btn = e.target.closest('.seg-btn'); if (!btn) return;
@@ -329,7 +353,7 @@
     Dashboard.state.datePresetCustom = false;
     Dashboard.state.latestOnly = false;
     Dashboard.state.categoryTab = 'exec';
-    document.querySelectorAll('#auditRecencySeg .seg-btn').forEach(function(b,i){ b.classList.toggle('active', i===0); });
+    document.querySelectorAll('#auditRecencySeg .seg-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-recency')==='latest'); });
     Dashboard.refreshAll();
   }
   [document.getElementById('resetFiltersBtn'), document.getElementById('resetFiltersBtnCapa')].forEach(function(btn){

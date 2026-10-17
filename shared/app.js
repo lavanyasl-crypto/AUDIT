@@ -27,11 +27,13 @@
     pods: null,     // Set of storeId or null = all
     clusters: null, // Set of cluster name or null = all
     geoMode: 'pan', // 'pan' | 'cluster' | 'city' — which geo toggle button is active (UI-level, independent of whether a subset is actually picked)
-    dateFrom: D.meta.dateRange.from,
-    dateTo: D.meta.dateRange.to,
+    // Default window matches the POD audit report's counting window (31 Aug–11 Oct),
+    // so the zone-tab counts land on the report's 273/331/317 FNV split out of the box.
+    dateFrom: '2026-08-31',
+    dateTo: '2026-10-11',
     cadenceGranularity: 'month', // 'day' | 'week' | 'month' — which trend the top-of-page toggle shows
     skuGroupBy: 'city',          // 'city' | 'store' | 'sku' — Expiry & SKU findings grouping
-    latestOnly: false,           // true = collapse to the single latest audit per store (Pod Audits sheet toggle)
+    latestOnly: true,            // true = collapse to the single latest audit per store (Pod Audits sheet toggle)
     categoryTab: 'exec'          // 'exec' | 'FNV' | 'Noice' | 'DBEM' — the business-category sub-tab
   };
   var ALL_CITIES = D.cityRollup.map(function(c){ return c.city; }).sort();
@@ -634,6 +636,130 @@
   }
 
   // ================================================================
+  // SECTION: POD Zones (Green / Yellow / Red)
+  // ================================================================
+  // Zone thresholds from the final report: the POD's score (average of the
+  // category's parameter scores, each 0/1/2) puts it in High Performing
+  // 80-100% (Green), Moderate 60-80% (Yellow) or Low Performing <60% (Red).
+  // Overall (exec tab) uses the audit's own scorePercent; a category tab
+  // scores only that category's params for the same audit.
+  var ZONE_DEFS = [
+    { key:'g', label:'Green zone',  range:'80–100% — High Performing', color:'var(--good)' },
+    { key:'y', label:'Yellow zone', range:'60–80% — Moderate',          color:'var(--warn)' },
+    { key:'r', label:'Red zone',    range:'<60% — Low Performing',     color:'var(--bad)' }
+  ];
+  function zoneOf(pct){ return pct >= 80 ? 'g' : pct >= 60 ? 'y' : 'r'; }
+
+  // Latest audit per store within the current filters. Score per the final
+  // report's zone methodology: for each checklist parameter take the WORST
+  // result across the store's zone rows in that audit (any Non-Compliance → 0,
+  // else any Partial → 1, else 2), then zone % = Σ scores ÷ (2 × params) × 100.
+  // 'Remarks' and NA rows are excluded. Reproduces the report's zone tables
+  // exactly (FNV 273/331/317 in the 31 Aug–11 Oct window).
+  function zonePodScores(cat){
+    var audits = D.audits.filter(function(a){ return cityOk(a.city) && podOk(a.storeId) && clusterOk(a.cluster) && within(a.date); });
+    var latestByStore = {};
+    audits.forEach(function(a){
+      var cur = latestByStore[a.storeId];
+      if (!cur || a.date > cur.date || (a.date === cur.date && a.id > cur.id)) latestByStore[a.storeId] = a;
+    });
+    var latest = Object.keys(latestByStore).map(function(k){ return latestByStore[k]; });
+    var latestById = {};
+    latest.forEach(function(a){ latestById[a.id] = a; });
+    var catParams = null;
+    if (cat && cat !== 'exec'){
+      catParams = {};
+      (D.categoryCompliance[cat] || []).forEach(function(p){ catParams[p.key] = true; });
+    }
+    var byStore = {};
+    (D.categoryStats.responses || []).forEach(function(t){
+      var a = latestById[t[0]];
+      if (!a) return;
+      if (catParams && (!catParams[t[1]] || t[3] !== cat)) return;
+      if (t[1] === 'Remarks') return;
+      var resp = t[2];
+      if (resp !== 'Compliance' && resp !== 'Non Compliance' && resp !== 'Partially Complied') return;
+      var rank = resp === 'Non Compliance' ? 3 : resp === 'Partially Complied' ? 2 : 1;
+      var s = byStore[a.storeId] = byStore[a.storeId] || { storeId:a.storeId, storeName:a.storeName, city:a.city, cluster:a.cluster, params:{} };
+      var cur = s.params[t[1]];
+      if (!cur || rank > cur.rank) s.params[t[1]] = { rank:rank, resp:resp };
+    });
+    return Object.keys(byStore).map(function(k){
+      var s = byStore[k], sum = 0, max = 0;
+      Object.keys(s.params).forEach(function(pk){
+        max += 2;
+        var resp = s.params[pk].resp;
+        if (resp === 'Non Compliance') {}
+        else if (resp === 'Partially Complied') sum += 1;
+        else sum += 2;
+      });
+      return { storeId:s.storeId, storeName:s.storeName, city:s.city, cluster:s.cluster, score: max ? Math.round(1000*sum/max)/10 : null };
+    }).filter(function(s){ return s.score !== null; });
+  }
+
+  function renderPodZones(){
+    var el = document.getElementById('podZones'); if (!el) return;
+    var cat = state.categoryTab || 'exec';
+    var pods = zonePodScores(cat);
+    if (state.pods) pods = pods.filter(function(p){ return state.pods.has(p.storeId); });
+    if (state.cities) pods = pods.filter(function(p){ return state.cities.has(p.city); });
+    if (state.clusters) pods = pods.filter(function(p){ return p.cluster && state.clusters.has(p.cluster); });
+
+    var buckets = { g:[], y:[], r:[] };
+    pods.forEach(function(p){ buckets[zoneOf(p.score)].push(p); });
+    Object.keys(buckets).forEach(function(z){
+      buckets[z].sort(function(a,b){ return b.score - a.score || a.storeName.localeCompare(b.storeName); });
+    });
+    var total = pods.length;
+    var catName = { exec:'All categories', FNV:'FNV', Noice:'Noice', DBEM:'DBEM' }[cat] || cat;
+
+    var summary = '<div class="zone-summary-strip">'+
+      '<span style="font-size:12px;color:var(--text-soft);font-weight:600">Summary — latest audit per POD ('+esc(catName)+')</span>'+
+      ZONE_DEFS.map(function(z){
+        var n = buckets[z.key].length;
+        return '<span><span class="ztag '+z.key+'">'+esc(z.label)+' PODs</span> <b style="font-size:20px;color:'+z.color+'">'+fmt(n)+'</b> <span style="color:var(--text-faint)">('+(total?Math.round(100*n/total*10)/10:0)+'%)</span></span>';
+      }).join('')+
+      '<span style="color:var(--text-faint);font-size:12px">Total '+fmt(total)+' PODs</span>'+
+    '</div>';
+
+    var cols = '<div class="zone-cols">'+ZONE_DEFS.map(function(z){
+      var list = buckets[z.key];
+      return '<div class="card zone-col">'+
+        '<div class="zone-col-head"><span class="zone-col-title"><span class="zone-dot" style="background:'+z.color+'"></span>'+esc(z.label)+' PODs</span>'+
+        '<span class="zone-col-count" style="color:'+z.color+'">'+fmt(list.length)+'</span></div>'+
+        '<div class="zone-col-range">'+esc(z.range)+'</div>'+
+        '<div class="zone-pod-list">'+
+        (list.length ? list.map(function(p){
+          return '<div class="zone-pod-row" data-store="'+esc(p.storeId)+'" title="'+esc(p.storeName)+' — '+esc(p.city)+' · '+p.score+'%">'+
+            '<span class="zp-name">'+esc(p.storeName)+'</span>'+
+            '<span class="zp-city">'+esc(p.city)+'</span>'+
+            '<span class="zp-score" style="color:'+z.color+'">'+p.score+'%</span>'+
+          '</div>';
+        }).join('') : '<div class="empty-state" style="padding:24px 8px">None</div>')+
+        '</div>'+
+      '</div>';
+    }).join('')+'</div>';
+
+    el.innerHTML = summary + cols;
+
+    el.querySelectorAll('.zone-pod-row').forEach(function(row){
+      row.addEventListener('click', function(){
+        var storeId = row.getAttribute('data-store');
+        var audit = latestAuditForStore(storeId);
+        if (audit){
+          var catLbl = cat === 'exec' ? 'All categories' : cat;
+          var body = '<div class="section-sub" style="margin-bottom:10px">'+esc(audit.city)+' · '+esc(audit.storeName)+' (ID '+esc(audit.storeId)+') · Latest audit '+esc(audit.date)+' · Score '+audit.scorePercent+'% · NC '+audit.nc+' · Partial '+audit.pc+'</div>'+
+            '<div class="empty-state" style="padding:20px">Full parameter breakdown is in the categorywise compliance tab — this POD is listed here because its '+esc(catLbl)+' score puts it in this zone.</div>';
+          openModal('store', esc(audit.storeName)+' — zone detail', body);
+        }
+      });
+    });
+
+    var sub = document.getElementById('podZonesSubtitle');
+    if (sub) sub.textContent = 'PODs grouped by their latest audit score ('+catName+'): Green zone 80–100% · Yellow zone 60–80% · Red zone <60%. Per parameter the worst result across the store\'s zone checks counts (any non-compliance = 0, partial = 1, compliant = 2); zone % is the average of those parameter scores.';
+  }
+
+  // ================================================================
   // SECTION: city / POD rollup tables
   // ================================================================
   function renderCityPodTables(f){
@@ -989,6 +1115,7 @@
     renderPodsAudited(f);
     renderCapaSla(f);
     renderCategoryCompliance();
+    renderPodZones();
     renderCityPodTables(f);
     renderSkuFindings(f);
     if (global.onDashboardRefresh) global.onDashboardRefresh(f);

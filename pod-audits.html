@@ -173,14 +173,9 @@
 
       <div class="grid kpi-grid" id="capaKpiGrid" style="margin-top:18px"></div>
 
-      <div class="section" id="sec-capa-breakdown">
-        <div class="section-head">
-          <div>
-            <div class="section-title" id="capaBreakdownTitle">City-wise CAPA closure detail</div>
-            <div class="section-sub" id="capaBreakdownSubtitle">Which cities and PODs still have CAPA not closed. Click a city to expand its POD list; click "View report" on any POD for its full CAPA history.</div>
-          </div>
-        </div>
-        <div class="card"><div id="capaBreakdown"></div></div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">CAPA by city and store — click a row for the checkpoint list, or "View report" for a summary</div>
+        <div id="capaOverdueTable"></div>
       </div>
     </div>
   </div>
@@ -485,89 +480,6 @@
       ' audits had findings, so a CAPA went to the store manager for each. The rest were clean — no CAPA is generated when there is nothing to fix.';
   }
 
-  function renderCapaBreakdown(f){
-    var el = document.getElementById('capaBreakdown'); if (!el) return;
-    var rows = capaCategoryFilter(f.capa);
-    if (!rows.length){ el.innerHTML = '<div class="empty-state">No CAPA tasks in the current filters.</div>'; return; }
-    var byCluster = (Dashboard.state.geoMode === 'cluster');
-    var groupLabel = byCluster ? 'Cluster' : 'City';
-    var byGroup = {};
-    rows.forEach(function(c){
-      var key = byCluster ? (c.cluster || 'Unmapped') : c.city;
-      var group = byGroup[key] = byGroup[key] || {};
-      (group[c.storeId] = group[c.storeId] || { storeId:c.storeId, storeName:c.storeName, city:c.city, tasks:[] }).tasks.push(c);
-    });
-    var groupRows = Object.keys(byGroup).map(function(groupName){
-      var stores = Object.keys(byGroup[groupName]).map(function(sid){
-        var s = byGroup[groupName][sid];
-        s.status = classifyStoreCapa(s.tasks);
-        s.overdue = s.tasks.filter(function(t){ return t.slaState==='open_overdue'||t.slaState==='in_progress_overdue'; }).length;
-        return s;
-      }).sort(function(a,b){ return a.storeName.localeCompare(b.storeName); });
-      var open = stores.filter(function(s){ return s.status==='Open'; }).length;
-      var progress = stores.filter(function(s){ return s.status==='In Progress'; }).length;
-      var closed = stores.filter(function(s){ return s.status==='Closed'; }).length;
-      return { name:groupName, stores:stores, open:open, progress:progress, closed:closed, total:stores.length };
-    }).sort(function(a,b){ return (b.open+b.progress)-(a.open+a.progress) || a.name.localeCompare(b.name); });
-
-    var expandedGroup = null;
-    function statusBadge(status){
-      if (status==='Closed') return '<span class="badge good">Closed</span>';
-      if (status==='In Progress') return '<span class="badge info">In progress</span>';
-      return '<span class="badge bad">Not closed</span>';
-    }
-    function expandHtml(cr){
-      return '<div class="compliance-expand-head">'+cr.stores.length.toLocaleString()+' PODs — click "View report" for the full CAPA history</div>'+
-        '<div class="compliance-expand-list">'+cr.stores.map(function(s){
-          return '<div class="compliance-expand-row" style="justify-content:space-between;align-items:center;cursor:default">'+
-            '<span>'+(byCluster?'<span class="ce-city">'+Dashboard.esc(s.city)+'</span>&nbsp;· ':'')+'<span class="ce-store">'+Dashboard.esc(s.storeName)+'</span>&nbsp; '+statusBadge(s.status)+(s.overdue?' <span class="badge bad">'+s.overdue+' overdue</span>':'')+'</span>'+
-            '<button type="button" class="view-report-btn" data-report="'+Dashboard.esc(s.storeId)+'">'+icon('note',{size:11})+'View report</button>'+
-          '</div>';
-        }).join('')+'</div>';
-    }
-    function draw(){
-      el.innerHTML = '<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button type="button" class="reset-btn" id="capaBreakdownCsvBtn">Download CSV</button></div>'+
-        '<div class="table-wrap"><table class="datatable compliance-table"><thead><tr>'+
-          '<th>'+groupLabel+'</th><th style="text-align:right">Stores with CAPA</th><th style="text-align:right">Not closed</th><th style="text-align:right">In progress</th><th style="text-align:right">Closed</th>'+
-        '</tr></thead><tbody>'+
-        groupRows.map(function(cr,i){
-          var open = expandedGroup === cr.name;
-          var main = '<tr class="compliance-row" data-i="'+i+'">'+
-            '<td class="param-cell">'+(open?'▾':'▸')+' '+Dashboard.esc(cr.name)+'</td>'+
-            '<td class="cnt-cell"><span>'+cr.total.toLocaleString()+'</span></td>'+
-            '<td class="cnt-cell" style="'+(cr.open?'':'opacity:.5')+'"><span>'+cr.open.toLocaleString()+'</span></td>'+
-            '<td class="cnt-cell"><span>'+cr.progress.toLocaleString()+'</span></td>'+
-            '<td class="cnt-cell"><span>'+cr.closed.toLocaleString()+'</span></td>'+
-          '</tr>';
-          return open ? main+'<tr class="compliance-expand"><td colspan="5">'+expandHtml(cr)+'</td></tr>' : main;
-        }).join('')+
-        '</tbody></table></div>';
-      el.querySelectorAll('.compliance-row').forEach(function(tr){
-        tr.addEventListener('click', function(){
-          var i = +tr.getAttribute('data-i');
-          expandedGroup = (expandedGroup === groupRows[i].name) ? null : groupRows[i].name;
-          draw();
-        });
-      });
-      el.querySelectorAll('[data-report]').forEach(function(btn){
-        btn.addEventListener('click', function(e){ e.stopPropagation(); Dashboard.openStoreReport(btn.getAttribute('data-report')); });
-      });
-      var csvBtn = document.getElementById('capaBreakdownCsvBtn');
-      if (csvBtn) csvBtn.addEventListener('click', function(){
-        var header = [groupLabel,'Stores with CAPA','Not closed','In progress','Closed'];
-        var rows = groupRows.map(function(cr){ return [cr.name, cr.total, cr.open, cr.progress, cr.closed]; });
-        var blob = new Blob([header.map(function(v){ return '"'+String(v)+'"'; }).join(',') + '\r\n' + rows.map(function(r){ return r.map(function(v){ return '"'+String(v)+'"'; }).join(','); }).join('\r\n')], { type:'text/csv;charset=utf-8;' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a'); a.href = url; a.download = (byCluster?'cluster-wise':'city-wise')+'-capa-closure-detail.csv';
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      });
-    }
-    draw();
-    var scope = Dashboard.state.clusters ? Array.from(Dashboard.state.clusters).join(', ') : (Dashboard.state.cities ? Array.from(Dashboard.state.cities).join(', ') : 'PAN India');
-    var titleEl = document.getElementById('capaBreakdownTitle'); if (titleEl) titleEl.textContent = (byCluster?'Cluster-wise':'City-wise') + ' CAPA closure detail';
-    document.getElementById('capaBreakdownSubtitle').textContent = 'Which '+(byCluster?'clusters':'cities')+' and PODs still have CAPA not closed ('+scope+'). Click a '+(byCluster?'cluster':'city')+' to expand its POD list; click "View report" on any POD for its full CAPA history (text only, no photos).';
-  }
 
   // ---------------- Executive summary pies: zone distribution + store CAPA status ----------------
   function renderExecPies(f){
@@ -616,7 +528,6 @@
     renderOverviewKpis(f);
     renderCapaKpis(f);
     renderCapaCoverage(f);
-    renderCapaBreakdown(f);
     renderExecPies(f);
     syncAllFilterUI();
     refreshDateStatusText();

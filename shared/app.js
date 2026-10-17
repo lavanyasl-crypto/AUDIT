@@ -650,6 +650,16 @@
   ];
   function zoneOf(pct){ return pct >= 80 ? 'g' : pct >= 60 ? 'y' : 'r'; }
 
+  // Mean of the per-store category scores from zonePodScores — the KPI card's
+  // "Average audit score" (overall for exec, per category on FNV/Noice/DBEM tabs).
+  function avgCategoryScore(cat){
+    var pods = zonePodScores(cat || 'exec');
+    if (!pods.length) return null;
+    var sum = 0;
+    pods.forEach(function(p){ sum += p.score; });
+    return Math.round(10*sum/pods.length)/10;
+  }
+
   // Latest audit per store within the current filters. Score per the final
   // report's zone methodology: for each checklist parameter take the WORST
   // result across the store's zone rows in that audit (any Non-Compliance → 0,
@@ -1129,5 +1139,5 @@
     refreshAll();
   }
 
-  global.Dashboard = { init:init, refreshAll:refreshAll, state:state, openModal:openModal, closeModal:closeModal, esc:esc, computeFiltered:computeFiltered, zoneCards:zoneNonCompliantCards, categoryCards:categoryNonCompliantCards, categoryTabs:CATEGORY_TABS, openStoreReport:openStoreReportModal, openCapaList:openCapaListModal };
+  global.Dashboard = { init:init, refreshAll:refreshAll, state:state, openModal:openModal, closeModal:closeModal, esc:esc, computeFiltered:computeFiltered, zoneCards:zoneNonCompliantCards, categoryCards:categoryNonCompliantCards, categoryTabs:CATEGORY_TABS, openStoreReport:openStoreReportModal, openCapaList:openCapaListModal, avgCategoryScore:avgCategoryScore };
 })(window);

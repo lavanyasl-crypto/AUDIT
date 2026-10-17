@@ -371,11 +371,13 @@
     var citiesCovered = f.citiesAudited.size;
     var cat = Dashboard.state.categoryTab || 'exec';
     var catCards = (cat === 'exec') ? Dashboard.zoneCards() : Dashboard.categoryCards(cat);
+    var avgScore = Dashboard.avgCategoryScore(cat);
+    var avgCard = avgScore === null ? [] : [{ key:'avgscore', value:avgScore+'%', label:(cat === 'exec' ? 'Average audit score' : CATEGORY_TITLES[cat] + ' average audit score') }];
     var cards = [
       { key:'audits', value:totalAudits.toLocaleString(), label:'No. of audits' },
       { key:'stores', value:storesAudited.toLocaleString(), label:'Stores audited' },
       { key:'cities', value:citiesCovered.toLocaleString(), label:'Cities covered' },
-    ].concat(catCards);
+    ].concat(avgCard, catCards);
     el.innerHTML = cards.map(function(c){ return Charts.kpiCard({ key:c.key, value:c.value, label:c.label }); }).join('');
     document.getElementById('ovSubtitle').textContent = storesAudited.toLocaleString() + ' stores audited. Scoring: 0 = Non-Compliance, 1 = Partial Compliance, 2 = Full Compliance, per the SCORING (0-1-2) column.';
     var scope = Dashboard.state.clusters ? Array.from(Dashboard.state.clusters).join(', ') : (Dashboard.state.cities ? Array.from(Dashboard.state.cities).join(', ') : 'PAN India');

@@ -91,7 +91,7 @@
         </div>
         <div class="card">
           <div class="section-title" style="font-size:14px">Store CAPA status</div>
-          <div class="section-sub">Open includes In Progress · whole dashboard</div>
+          <div class="section-sub">Open / In Progress / Closed · whole dashboard</div>
           <div id="capaPie"></div>
         </div>
       </div>
@@ -508,19 +508,21 @@
       });
     }
     if (capaEl){
-      // whole dashboard: store-level CAPA status — Open counts Open + In Progress
+      // whole dashboard: store-level CAPA status — Open / In Progress / Closed shown separately
       var byStore = {};
       D.capa.forEach(function(c){ (byStore[c.storeId] = byStore[c.storeId] || []).push(c); });
-      var open = 0, closed = 0;
+      var open = 0, inProg = 0, closed = 0;
       Object.keys(byStore).forEach(function(k){
         var tasks = byStore[k];
         if (tasks.every(function(t){ return t.status === 'Closed'; })) closed++;
+        else if (tasks.some(function(t){ return t.status === 'In Progress'; })) inProg++;
         else open++;
       });
       Charts.donut(capaEl, {
-        size:190, thickness:64, centerValue:Charts.fmt(open + closed), centerLabel:'Stores',
+        size:190, thickness:64, centerValue:Charts.fmt(open + inProg + closed), centerLabel:'Stores',
         segments:[
-          { label:'Open (incl. In Progress)', value:open, color:'var(--warn)' },
+          { label:'Open', value:open, color:'var(--warn)' },
+          { label:'In Progress', value:inProg, color:'var(--info)' },
           { label:'Closed', value:closed, color:'var(--good)' },
         ]
       });

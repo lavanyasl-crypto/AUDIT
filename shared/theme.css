@@ -27,6 +27,9 @@
   --bad:#c0271b;
   --bad-soft:#fde8e6;
   --bad-line:#f3a29b;
+  --zone-yellow:#eab308;
+  --zone-yellow-soft:#fdf6d8;
+  --zone-yellow-line:#e3c440;
   --info:#1d4ed8;
   --info-soft:#e8eefd;
 
@@ -76,6 +79,10 @@
   --bad-line:#7a2620;
   --info:#60a5fa;
   --info-soft:#101d33;
+
+  --zone-yellow:#facc15;
+  --zone-yellow-soft:#2a250c;
+  --zone-yellow-line:#7a6a11;
 
   --z-expiry:#f87171;
   --z-chiller:#60a5fa;
@@ -333,5 +340,5 @@ table.datatable tbody tr:last-child td{border-bottom:none}
 .zone-summary-strip{display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center;margin-bottom:14px}
 .zone-summary-strip .ztag{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px}
 .ztag.g{background:var(--good-soft);color:var(--good)}
-.ztag.y{background:var(--warn-soft);color:var(--warn)}
+.ztag.y{background:var(--zone-yellow-soft);color:var(--accent-ink)}
 .ztag.r{background:var(--bad-soft);color:var(--bad)}

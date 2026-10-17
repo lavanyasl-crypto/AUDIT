@@ -658,7 +658,7 @@
   // scores only that category's params for the same audit.
   var ZONE_DEFS = [
     { key:'g', label:'Green zone',  range:'80–100% — High Performing', color:'var(--good)' },
-    { key:'y', label:'Yellow zone', range:'60–80% — Moderate',          color:'var(--warn)' },
+    { key:'y', label:'Yellow zone', range:'60–80% — Moderate',          color:'var(--zone-yellow)' },
     { key:'r', label:'Red zone',    range:'<60% — Low Performing',     color:'var(--bad)' }
   ];
   function zoneOf(pct){ return pct >= 80 ? 'g' : pct >= 60 ? 'y' : 'r'; }

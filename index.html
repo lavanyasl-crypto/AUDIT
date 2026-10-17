@@ -303,6 +303,8 @@
         return;
       }
       Dashboard.state.categoryTab = cat;
+      // Executive Summary is PAN-India-only — drop any city/cluster selection
+      if (cat === 'exec'){ Dashboard.state.cities = null; Dashboard.state.clusters = null; Dashboard.state.geoMode = 'pan'; }
       Dashboard.refreshAll();
     });
   });
@@ -340,6 +342,9 @@
     }
     [datePresetSeg, datePresetSegCapa].forEach(function(seg){ if (!seg) return; seg.querySelectorAll('.seg-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-preset')===preset); }); });
     var mode = s.geoMode || 'pan';
+    // Executive Summary is PAN-India-only: force pan mode + clear geo selections
+    var execPanOnly = !s.categoryTab || s.categoryTab === 'exec';
+    if (execPanOnly){ mode = 'pan'; }
     [geoSeg, geoSegCapa].forEach(function(seg){
       if (!seg) return;
       var hasMode = false;
@@ -349,9 +354,8 @@
         b.classList.toggle('active', hasMode ? (g===mode) : (g==='pan'));
       });
     });
-    var citySelEl = document.getElementById('citySel'); if (citySelEl) citySelEl.classList.toggle('hidden', mode!=='city');
-    var citySelCapaEl = document.getElementById('citySelCapa'); if (citySelCapaEl) citySelCapaEl.classList.toggle('hidden', mode!=='city');
-    var clusterSelCapaEl = document.getElementById('clusterSelCapa'); if (clusterSelCapaEl) clusterSelCapaEl.classList.toggle('hidden', mode!=='cluster');
+    [geoSeg, geoSegCapa].forEach(function(seg){ if (seg) seg.style.display = execPanOnly ? 'none' : ''; });
+    [document.getElementById('podSel'), document.getElementById('podSelCapa'), document.getElementById('citySel'), document.getElementById('citySelCapa'), document.getElementById('clusterSelCapa')].forEach(function(el){ if (el) el.style.display = execPanOnly ? 'none' : ''; });
     [categoryTabSeg, categoryTabSegCapa].forEach(function(seg){ if (!seg) return; seg.querySelectorAll('.seg-btn').forEach(function(b){ var c = b.getAttribute('data-cat'); if (c!=='capa') b.classList.toggle('active', c===s.categoryTab); }); });
   }
 
@@ -573,8 +577,13 @@
 
   // ---------------- Executive summary pies: zone distribution + store CAPA status ----------------
   function renderExecPies(f){
+    var piesEl = document.getElementById('execPies');
     var zoneEl = document.getElementById('zonePie');
     var capaEl = document.getElementById('capaPie');
+    // pies are executive-summary only — hidden on FNV/Noice/DBEM tabs
+    var isExec = (Dashboard.state.categoryTab || 'exec') === 'exec';
+    if (piesEl) piesEl.style.display = isExec ? '' : 'none';
+    if (!isExec) return;
     if (zoneEl){
       // same buckets as the POD zones table below (renderPodZones) — zone % per POD
       var counts = { g:0, y:0, r:0 };

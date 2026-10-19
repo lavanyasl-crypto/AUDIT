@@ -53,12 +53,12 @@ function loadMergedCSV(dir, prefix) {
 }
 
 const FILES = {
-  storeMaster: { dir: 'Store master', prefix: 'Pod Audit Tool - Store Master' },
+  storeMaster: { dir: 'Store master - Copy', prefix: 'Pod Audit Tool - Store Master' },
   audits: { dir: 'Audits', prefix: 'Pod Audit Tool - Audits' },
   capa: { dir: 'Capa Tasks', prefix: 'Pod Audit Tool - CAPA Tasks' },
   responses: { dir: 'Audit Response', prefix: 'Pod Audit Tool - Audit Responses' },
   sku: { dir: 'Audit SKU wise', prefix: 'Expiry Capture — Archive Data (cold history) - Audit Sku Checks' },
-  zoneVerify: { dir: 'Zone verify check', prefix: 'Pod Audit Tool - Audit Zone Verify Checks' },
+  zoneVerify: { dir: 'Zone verify check - Copy', prefix: 'Pod Audit Tool - Audit Zone Verify Checks' },
   expiryItems: { dir: 'expiry check items', prefix: 'Expiry Capture — Archive Data (cold history) - Expiry Check Items' },
   clusterDetails: { dir: 'Cluster details', prefix: 'Daily Review-redline - WTD' },
   // Deliberately not deep-processed:

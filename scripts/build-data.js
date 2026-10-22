@@ -120,6 +120,13 @@ function toDate(s) {
 }
 function dateOnly(s) {
   if (!s) return null;
+  // Some exports (e.g. the 2026-10-22 Audits slice) use US slash format (M/D/YYYY)
+  // instead of ISO; convert so downstream new Date(...) parses it.
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s.trim());
+  if (m) {
+    const [, mo, d, y] = m;
+    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
   return s.slice(0, 10);
 }
 function isoWeekLabel(dateStr) {

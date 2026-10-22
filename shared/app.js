@@ -56,10 +56,13 @@
   }
 
   // ---------------- filtered views ----------------
-  // When "Latest audit" mode is on, parameter stats can't come from the precomputed
-  // aggregates (they cover ALL audits) — they are recomputed from the per-response
-  // triples (D.categoryStats.responses) restricted to the kept latest audits.
-  var latestParamStats = null; // paramKey -> byPod array, or null in all-audits mode
+  // Parameter stats are ALWAYS recomputed from the per-response triples
+  // (D.categoryStats.responses) restricted to the date+geo filtered audits —
+  // the precomputed p.byPod aggregates cover ALL audits and would make the
+  // parameter KPI cards freeze when the date range changes. In "Latest audit"
+  // mode the audit list is collapsed to one audit per store first, so the same
+  // recompute serves both modes.
+  var latestParamStats = null; // paramKey -> byPod array (recomputed per filter change)
   var latestParamStatsByCat = null; // category -> paramKey -> byPod array
   function computeLatestParamStats(audits){
     var latestIds = new Set(audits.map(function(a){ return a.id; }));
@@ -101,10 +104,8 @@
       var latestByStore = {};
       audits.forEach(function(a){ if (!latestByStore[a.storeId] || a.date > latestByStore[a.storeId].date) latestByStore[a.storeId] = a; });
       audits = Object.keys(latestByStore).map(function(k){ return latestByStore[k]; });
-      latestParamStats = computeLatestParamStats(audits);
-    } else {
-      latestParamStats = null;
     }
+    computeLatestParamStats(audits);
     var capa = D.capa.filter(function(c){ return cityOk(c.city) && podOk(c.storeId) && clusterOk(c.cluster) && within(c.auditDate); });
     var drilldown = {};
     Object.keys(D.drilldown).forEach(function(k){
@@ -123,6 +124,26 @@
     var firstThu = new Date(Date.UTC(dt.getUTCFullYear(),0,4));
     var week = 1 + Math.round(((dt-firstThu)/86400000 - 3 + ((firstThu.getUTCDay()+6)%7))/7);
     return dt.getUTCFullYear()+'-W'+String(week).padStart(2,'0');
+  }
+  function isoWeekKeyOf(dstr){ return isoWeekKey(new Date(dstr+'T00:00:00Z')); }
+  // '2026-W36' -> {from:'2026-08-31', to:'2026-09-06'} — ISO week = Monday..Sunday
+  function isoWeekRange(key){
+    var p = key.split('-W'), year = +p[0], wk = +p[1];
+    var jan4 = new Date(Date.UTC(year,0,4));
+    var day = (jan4.getUTCDay()+6)%7;
+    var monday = new Date(Date.UTC(year,0,4)); monday.setUTCDate(jan4.getUTCDate()-day+(wk-1)*7);
+    var sunday = new Date(monday); sunday.setUTCDate(monday.getUTCDate()+6);
+    return { from: monday.toISOString().slice(0,10), to: sunday.toISOString().slice(0,10) };
+  }
+  function lastDayOfMonth(ym){ var y=+ym.slice(0,4), m=+ym.slice(5,7); return new Date(Date.UTC(y,m,0)).getUTCDate(); }
+  // Week/month keys that actually have audits — feeds the Weekly/Monthly dropdowns
+  function filterWeeks(){
+    var set = {}; D.audits.forEach(function(a){ set[isoWeekKeyOf(a.date)] = true; });
+    return Object.keys(set).sort();
+  }
+  function filterMonths(){
+    var set = {}; D.audits.forEach(function(a){ set[a.date.slice(0,7)] = true; });
+    return Object.keys(set).sort();
   }
 
   // ================================================================
@@ -782,6 +803,7 @@
     if (sub) sub.textContent = 'PODs grouped by their latest audit score ('+catName+'): Green zone 80–100% · Yellow zone 60–80% · Red zone <60%. Per parameter the worst result across the store\'s zone checks counts (any non-compliance = 0, partial = 1, compliant = 2); zone % is the average of those parameter scores.';
   }
 
+
   // ================================================================
   // SECTION: city / POD rollup tables
   // ================================================================
@@ -1166,5 +1188,5 @@
     refreshAll();
   }
 
-  global.Dashboard = { init:init, refreshAll:refreshAll, state:state, openModal:openModal, closeModal:closeModal, esc:esc, computeFiltered:computeFiltered, zoneCards:zoneNonCompliantCards, categoryCards:categoryNonCompliantCards, categoryTabs:CATEGORY_TABS, openStoreReport:openStoreReportModal, openCapaList:openCapaListModal, avgCategoryScore:avgCategoryScore, zonePodScoresForPies:function(){ return zonePodScores(state.categoryTab || 'exec'); } };
+  global.Dashboard = { init:init, refreshAll:refreshAll, state:state, openModal:openModal, closeModal:closeModal, esc:esc, computeFiltered:computeFiltered, zoneCards:zoneNonCompliantCards, categoryCards:categoryNonCompliantCards, categoryTabs:CATEGORY_TABS, openStoreReport:openStoreReportModal, openCapaList:openCapaListModal, avgCategoryScore:avgCategoryScore, zonePodScoresForPies:function(){ return zonePodScores(state.categoryTab || 'exec'); }, filterWeeks:filterWeeks, filterMonths:filterMonths, isoWeekRange:isoWeekRange, isoWeekKeyOf:isoWeekKeyOf, lastDayOfMonth:lastDayOfMonth };
 })(window);

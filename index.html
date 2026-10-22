@@ -48,6 +48,8 @@
             <button type="button" class="seg-btn" data-preset="week">Weekly</button>
             <button type="button" class="seg-btn" data-preset="month">Monthly</button>
           </div>
+          <select class="date-input" id="weekSel" style="display:none"></select>
+          <select class="date-input" id="monthSel" style="display:none"></select>
           <span class="flabel">From</span>
           <input type="date" class="date-input" id="dateFrom">
           <span class="flabel">To</span>
@@ -142,6 +144,8 @@
             <button type="button" class="seg-btn" data-preset="week">Weekly</button>
             <button type="button" class="seg-btn" data-preset="month">Monthly</button>
           </div>
+          <select class="date-input" id="weekSelCapa" style="display:none"></select>
+          <select class="date-input" id="monthSelCapa" style="display:none"></select>
           <span class="flabel">From</span>
           <input type="date" class="date-input" id="dateFromCapa">
           <span class="flabel">To</span>
@@ -220,6 +224,55 @@
   var categoryTabSeg = document.getElementById('categoryTabSeg'), categoryTabSegCapa = document.getElementById('categoryTabSegCapa');
   [dateFromElCapa, dateToElCapa].forEach(function(el){ if (el){ el.min = D.meta.dateRange.from; el.max = D.meta.dateRange.to; } });
 
+  // Weekly/Monthly dropdowns: pick a week number or a month instead of typing dates.
+  // Weeks use ISO numbering (same as the IGCC weekly summary, e.g. 2026-10-05 = W41)
+  // and only weeks/months that actually have audits are listed.
+  var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var weekSels = [document.getElementById('weekSel'), document.getElementById('weekSelCapa')];
+  var monthSels = [document.getElementById('monthSel'), document.getElementById('monthSelCapa')];
+  function weekOptionLabel(key){
+    var r = Dashboard.isoWeekRange(key);
+    return 'Week '+(+key.split('-W')[1])+'  ('+r.from.slice(5)+' → '+r.to.slice(5)+')';
+  }
+  function monthOptionLabel(ym){
+    return MONTH_NAMES[(+ym.slice(5,7))-1]+' '+ym.slice(0,4);
+  }
+  function populateDateDropdowns(){
+    weekSels.forEach(function(sel){
+      if (!sel) return;
+      sel.innerHTML = '<option value="">Select week…</option>' + Dashboard.filterWeeks().map(function(k){
+        return '<option value="'+k+'">'+weekOptionLabel(k)+'</option>';
+      }).join('');
+    });
+    monthSels.forEach(function(sel){
+      if (!sel) return;
+      sel.innerHTML = '<option value="">Select month…</option>' + Dashboard.filterMonths().map(function(m){
+        return '<option value="'+m+'">'+monthOptionLabel(m)+'</option>';
+      }).join('');
+    });
+  }
+  populateDateDropdowns();
+  weekSels.forEach(function(sel){
+    if (!sel) return;
+    sel.addEventListener('change', function(){
+      if (!sel.value) return;
+      var r = Dashboard.isoWeekRange(sel.value);
+      Dashboard.state.dateFrom = r.from; Dashboard.state.dateTo = r.to;
+      Dashboard.state.datePresetCustom = false;
+      Dashboard.refreshAll();
+    });
+  });
+  monthSels.forEach(function(sel){
+    if (!sel) return;
+    sel.addEventListener('change', function(){
+      if (!sel.value) return;
+      Dashboard.state.dateFrom = sel.value+'-01';
+      Dashboard.state.dateTo = sel.value+'-'+String(Dashboard.lastDayOfMonth(sel.value)).padStart(2,'0');
+      Dashboard.state.datePresetCustom = false;
+      Dashboard.refreshAll();
+    });
+  });
+
   [datePresetSeg, datePresetSegCapa].forEach(function(seg){
     if (!seg) return;
     seg.addEventListener('click', function(e){
@@ -227,8 +280,8 @@
       var preset = btn.getAttribute('data-preset');
       var latest = D.meta.dateRange.to;
       if (preset === 'day'){ Dashboard.state.dateFrom = latest; Dashboard.state.dateTo = latest; Dashboard.state.datePresetCustom = false; }
-      else if (preset === 'week'){ var d = new Date(latest+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-6); Dashboard.state.dateFrom = d.toISOString().slice(0,10); Dashboard.state.dateTo = latest; Dashboard.state.datePresetCustom = false; }
-      else if (preset === 'month'){ Dashboard.state.dateFrom = latest.slice(0,7)+'-01'; Dashboard.state.dateTo = latest; Dashboard.state.datePresetCustom = false; }
+      else if (preset === 'week'){ var wks = Dashboard.filterWeeks(); var r = Dashboard.isoWeekRange(wks[wks.length-1]); Dashboard.state.dateFrom = r.from; Dashboard.state.dateTo = r.to; Dashboard.state.datePresetCustom = false; }
+      else if (preset === 'month'){ var mos = Dashboard.filterMonths(); var ym = mos[mos.length-1]; Dashboard.state.dateFrom = ym+'-01'; Dashboard.state.dateTo = ym+'-'+String(Dashboard.lastDayOfMonth(ym)).padStart(2,'0'); Dashboard.state.datePresetCustom = false; }
       else if (preset === 'custom'){ Dashboard.state.datePresetCustom = true; } // keep From/To as they are
       Dashboard.refreshAll();
     });
@@ -311,14 +364,34 @@
     if (s.datePresetCustom) { preset = 'custom'; }
     else {
       preset = 'custom';
-      if (s.dateFrom === latest && s.dateTo === latest) preset = 'day';
+      if (s.dateFrom === s.dateTo) preset = 'day';
       else {
-        var wk = new Date(latest+'T00:00:00Z'); wk.setUTCDate(wk.getUTCDate()-6);
-        if (s.dateTo === latest && s.dateFrom === wk.toISOString().slice(0,10)) preset = 'week';
-        else if (s.dateTo === latest && s.dateFrom === latest.slice(0,7)+'-01') preset = 'month';
+        // any full ISO week present in the data counts as Weekly, any full month as Monthly
+        var wkMatch = Dashboard.filterWeeks().some(function(k){ var r = Dashboard.isoWeekRange(k); return r.from===s.dateFrom && r.to===s.dateTo; });
+        if (wkMatch) preset = 'week';
+        else {
+          var ym = s.dateFrom.slice(0,7);
+          if (ym===s.dateTo.slice(0,7) && s.dateFrom.slice(8)==='01' && s.dateTo===ym+'-'+String(Dashboard.lastDayOfMonth(ym)).padStart(2,'0')) preset = 'month';
+        }
       }
     }
     [datePresetSeg, datePresetSegCapa].forEach(function(seg){ if (!seg) return; seg.querySelectorAll('.seg-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-preset')===preset); }); });
+    // dropdown visibility follows the active preset; selection reflects the current range
+    var showWeek = preset==='week', showMonth = preset==='month';
+    var wkKey = null, matched = false;
+    if (showWeek || showMonth){
+      weekSels.forEach(function(sel){
+        if (!sel) return;
+        sel.value = '';
+        Dashboard.filterWeeks().forEach(function(k){
+          var r = Dashboard.isoWeekRange(k);
+          if (r.from===s.dateFrom && r.to===s.dateTo){ sel.value = k; matched = true; }
+        });
+      });
+      monthSels.forEach(function(sel){ if (sel) sel.value = (s.dateFrom.slice(0,7)===s.dateTo.slice(0,7)) ? s.dateFrom.slice(0,7) : ''; });
+    }
+    weekSels.forEach(function(sel){ if (sel){ sel.style.display = showWeek ? '' : 'none'; } });
+    monthSels.forEach(function(sel){ if (sel){ sel.style.display = showMonth ? '' : 'none'; } });
     var mode = s.geoMode || 'pan';
     // Executive Summary is PAN-India-only: force pan mode + clear geo selections
     var execPanOnly = !s.categoryTab || s.categoryTab === 'exec';

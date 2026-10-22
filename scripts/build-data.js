@@ -57,7 +57,7 @@ const FILES = {
   audits: { dir: 'Audits', prefix: 'Pod Audit Tool - Audits' },
   capa: { dir: 'Capa Tasks', prefix: 'Pod Audit Tool - CAPA Tasks' },
   responses: { dir: 'Audit Response', prefix: 'Pod Audit Tool - Audit Responses' },
-  sku: { dir: 'Audit SKU wise', prefix: 'Expiry Capture — Archive Data (cold history) - Audit Sku Checks' },
+  sku: { dir: 'Audit SKU wise', prefix: 'ARCHIVE AUDIT RESPONSES - Audit Sku Checks' },
   zoneVerify: { dir: 'Zone verify check - Copy', prefix: 'Pod Audit Tool - Audit Zone Verify Checks' },
   expiryItems: { dir: 'expiry check items', prefix: 'Expiry Capture — Archive Data (cold history) - Expiry Check Items' },
   clusterDetails: { dir: 'Cluster details', prefix: 'Daily Review-redline - WTD' },
@@ -120,12 +120,13 @@ function toDate(s) {
 }
 function dateOnly(s) {
   if (!s) return null;
-  // Some exports (e.g. the 2026-10-22 Audits slice) use US slash format (M/D/YYYY)
-  // instead of ISO; convert so downstream new Date(...) parses it.
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s.trim());
+  s = s.trim();
+  // Some exports (e.g. "Pod Audit Tool - Audits (4)") switched auditDate to US format
+  // M/D/YYYY; normalize so dedup keys match the ISO rows in older exports.
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) {
-    const [, mo, d, y] = m;
-    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    const [, mo, dy, yr] = m;
+    return `${yr}-${mo.padStart(2, '0')}-${dy.padStart(2, '0')}`;
   }
   return s.slice(0, 10);
 }

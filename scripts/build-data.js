@@ -120,13 +120,12 @@ function toDate(s) {
 }
 function dateOnly(s) {
   if (!s) return null;
-  s = s.trim();
-  // Some exports (e.g. "Pod Audit Tool - Audits (4)") switched auditDate to US format
-  // M/D/YYYY; normalize so dedup keys match the ISO rows in older exports.
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  // Some exports (e.g. the 2026-10-22 Audits slice) use US slash format (M/D/YYYY)
+  // instead of ISO; convert so downstream new Date(...) parses it.
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s.trim());
   if (m) {
-    const [, mo, dy, yr] = m;
-    return `${yr}-${mo.padStart(2, '0')}-${dy.padStart(2, '0')}`;
+    const [, mo, d, y] = m;
+    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
   return s.slice(0, 10);
 }
@@ -341,7 +340,9 @@ function main() {
   for (const [aid, v] of respAgg) {
     if (auditedIds.has(aid) || rawAuditIds.has(aid)) continue;
     const date = dateOnly(v.firstCreated);
-    if (!date || !v.storeId || !v.username) continue;
+    // username is not used by the synthesized audit itself — some refreshed Responses
+    // exports blank it for older audits (74 as of 2026-10-23), so don't gate on it.
+    if (!date || !v.storeId) continue;
     const key = v.storeId + '|' + date;
     synthesizedRaw++;
     const prev = recoveredByKey.get(key);

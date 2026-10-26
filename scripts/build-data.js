@@ -54,7 +54,9 @@ function loadMergedCSV(dir, prefix) {
 
 const FILES = {
   storeMaster: { dir: 'Store master - Copy', prefix: 'Pod Audit Tool - Store Master' },
-  audits: { dir: 'Audits', prefix: 'Pod Audit Tool - Audits' },
+  // The Audits sheet was renamed in Google Sheets ("Expiry Capture — Archive Data (cold history)"),
+  // so exports now carry that prefix instead of "Pod Audit Tool - Audits".
+  audits: { dir: 'Audits', prefix: 'Expiry Capture — Archive Data (cold history) - Audits' },
   capa: { dir: 'Capa Tasks', prefix: 'Pod Audit Tool - CAPA Tasks' },
   responses: { dir: 'Audit Response', prefix: 'Pod Audit Tool - Audit Responses' },
   sku: { dir: 'Audit SKU wise', prefix: 'ARCHIVE AUDIT RESPONSES - Audit Sku Checks' },

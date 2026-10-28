@@ -13,8 +13,9 @@ const OUT_JS = path.join(__dirname, '..', 'data', 'dashboard-data.js');
 // matching the folder + name prefix and drop exact-duplicate rows; the per-entity dedup
 // downstream (store+date for audits, auditId+questionNo for CAPA, keptAuditIds gate)
 // collapses overlapping history safely.
-function loadMergedCSV(dir, prefix) {
+function loadMergedCSV(dir, prefixes) {
   const full = path.join(ROOT, dir);
+  const prefixList = Array.isArray(prefixes) ? prefixes : [prefixes];
   // Scan subfolders too (e.g. "backup 2026-10-08") — full-history files sometimes end up there.
   const walk = (d) =>
     fs
@@ -25,10 +26,10 @@ function loadMergedCSV(dir, prefix) {
       });
   const matches = walk(full)
     .map((p) => path.relative(full, p).replaceAll('\\', '/'))
-    .filter((rel) => rel.toLowerCase().endsWith('.csv') && path.basename(rel).startsWith(prefix))
+    .filter((rel) => rel.toLowerCase().endsWith('.csv') && prefixList.some((p) => path.basename(rel).startsWith(p)))
     .sort();
   if (!matches.length) {
-    throw new Error(`No CSV starting with "${prefix}" found in "${dir}"`);
+    throw new Error(`No CSV starting with ${JSON.stringify(prefixList)} found in "${dir}"`);
   }
   let headers = null;
   const seen = new Set();
@@ -55,8 +56,11 @@ function loadMergedCSV(dir, prefix) {
 const FILES = {
   storeMaster: { dir: 'Store master - Copy', prefix: 'Pod Audit Tool - Store Master' },
   // The Audits sheet was renamed in Google Sheets ("Expiry Capture — Archive Data (cold history)"),
-  // so exports now carry that prefix instead of "Pod Audit Tool - Audits".
-  audits: { dir: 'Audits', prefix: 'Expiry Capture — Archive Data (cold history) - Audits' },
+  // so exports now carry that prefix instead of "Pod Audit Tool - Audits". The renamed export is
+  // only a partial slice (Oct 9 onward), while older full-history files keep the old prefix
+  // (e.g. "Pod Audit Tool - Audits merged 2026-10-27.csv") — match BOTH or September vanishes
+  // from real audit rows and gets synthesized with estimated scores.
+  audits: { dir: 'Audits', prefixes: ['Expiry Capture — Archive Data (cold history) - Audits', 'Pod Audit Tool - Audits'] },
   capa: { dir: 'Capa Tasks', prefix: 'Pod Audit Tool - CAPA Tasks' },
   responses: { dir: 'Audit Response', prefix: 'Pod Audit Tool - Audit Responses' },
   sku: { dir: 'Audit SKU wise', prefix: 'ARCHIVE AUDIT RESPONSES - Audit Sku Checks' },
@@ -73,7 +77,7 @@ const FILES = {
 const FILE = FILES; // loadMerged(FILE.x) shorthand at call sites
 
 function loadMerged(def) {
-  return loadMergedCSV(def.dir, def.prefix);
+  return loadMergedCSV(def.dir, def.prefixes || def.prefix);
 }
 
 // ---------- CSV parsing (RFC4180-ish, handles quoted commas/newlines) ----------
@@ -346,6 +350,9 @@ function main() {
     // exports blank it for older audits (74 as of 2026-10-23), so don't gate on it.
     if (!date || !v.storeId) continue;
     const key = v.storeId + '|' + date;
+    // Strict 1-audit-per-store+day: skip a recovered id when a real audit for the
+    // same store+date was already kept — otherwise the synthesized copy double-counts.
+    if (auditGroups.has(key)) continue;
     synthesizedRaw++;
     const prev = recoveredByKey.get(key);
     if (!prev || v.firstCreated < prev.firstCreated) recoveredByKey.set(key, { aid, ...v, date });

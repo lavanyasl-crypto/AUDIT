@@ -26,8 +26,18 @@ function loadMergedCSV(dir, prefixes) {
       });
   const matches = walk(full)
     .map((p) => path.relative(full, p).replaceAll('\\', '/'))
-    .filter((rel) => rel.toLowerCase().endsWith('.csv') && prefixList.some((p) => path.basename(rel).startsWith(p)))
-    .sort();
+    .filter((rel) => rel.toLowerCase().endsWith('.csv') && prefixList.some((p) => path.basename(rel).startsWith(p)));
+  // Process OLDEST snapshot first so that when the same task appears in several exports
+  // with an identical createdAt (Google Sheets exports don't bump it), the NEWEST file's
+  // row wins the equal-key tie. Plain .sort() is alphabetical and puts "backup ..."
+  // folders AFTER the main files — stale Open rows from backups then overwrote Closed
+  // rows from fresh exports (302 tasks flipped Closed->Open on 2026-10-29; W42 closures
+  // collapsed 841->630). mtime order: last downloaded = freshest snapshot.
+  matches.sort((a, b) => {
+    const da = fs.statSync(path.join(full, a)).mtimeMs;
+    const db = fs.statSync(path.join(full, b)).mtimeMs;
+    return da - db || (a < b ? -1 : 1);
+  });
   if (!matches.length) {
     throw new Error(`No CSV starting with ${JSON.stringify(prefixList)} found in "${dir}"`);
   }

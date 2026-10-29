@@ -1001,6 +1001,14 @@
           (opts.onViewReport ? '<td><button type="button" class="view-report-btn" data-report-btn data-i="'+i+'">'+icon('note',{size:11})+'View report</button></td>' : '')+
         '</tr>';
       }).join('') : ('<tr><td colspan="'+colCount+'"><div class="empty-state">No matching rows.</div></td></tr>');
+      // draw() rebuilds the whole table HTML; capture search-input focus/caret so a
+      // re-draw triggered by typing doesn't drop focus after every letter.
+      var hadFocus = document.activeElement;
+      var caret = null;
+      var prevSearch = el.querySelector('.search-box input');
+      if (prevSearch && hadFocus === prevSearch){
+        caret = { start: prevSearch.selectionStart, end: prevSearch.selectionEnd };
+      }
       el.innerHTML =
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;flex-wrap:wrap;gap:8px">'+
           (opts.searchable ? '<div class="search-box">'+icon('search',{size:14})+'<input type="text" placeholder="Search this table…" value="'+esc(search)+'"/></div>' : '<div></div>')+
@@ -1019,7 +1027,13 @@
         });
       });
       var input = el.querySelector('.search-box input');
-      if (input) input.addEventListener('input', function(){ search = input.value; page = 0; draw(); });
+      if (input){
+        input.addEventListener('input', function(){ search = input.value; page = 0; draw(); });
+        if (caret){
+          input.focus();
+          try { input.setSelectionRange(caret.start, caret.end); } catch(e){}
+        }
+      }
       var csvBtn = el.querySelector('[data-csv-btn]');
       if (csvBtn) csvBtn.addEventListener('click', function(){
         var cols = opts.columns.filter(function(c){ return !c.render || c.csv !== false; });

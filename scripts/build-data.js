@@ -285,11 +285,16 @@ function main() {
   }
   const audits = []; // deduped canonical audits
   for (const [key, group] of auditGroups) {
-    let best = group[0], bestTime = -1;
+    // Resubmissions can share an identical startedAt (e.g. aud_1791515975841,
+    // 2026-10-09: 3 submissions, one startedAt) — break ties on createdAt so
+    // the winner never depends on export file order.
+    let best = group[0], bestTime = -1, bestCreated = -1;
     for (const r of group) {
       const t = toDate(get(r, au.idx, 'startedAt')) || toDate(get(r, au.idx, 'createdAt'));
       const ms = t ? t.getTime() : 0;
-      if (ms >= bestTime) { bestTime = ms; best = r; }
+      const c = toDate(get(r, au.idx, 'createdAt'));
+      const cms = c ? c.getTime() : 0;
+      if (ms > bestTime || (ms === bestTime && cms >= bestCreated)) { bestTime = ms; bestCreated = cms; best = r; }
     }
     const storeId = get(best, au.idx, 'storeId');
     // Store Master's city is authoritative; a per-audit-row storeLocation typo (e.g. an

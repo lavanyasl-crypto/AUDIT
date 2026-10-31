@@ -27,10 +27,11 @@
     pods: null,     // Set of storeId or null = all
     clusters: null, // Set of cluster name or null = all
     geoMode: 'pan', // 'pan' | 'cluster' | 'city' — which geo toggle button is active (UI-level, independent of whether a subset is actually picked)
-    // Default window matches the POD audit report's counting window (31 Aug–11 Oct),
-    // so the zone-tab counts land on the report's 273/331/317 FNV split out of the box.
-    dateFrom: '2026-08-31',
-    dateTo: '2026-10-11',
+    // Default window = the full data range, so CAPA-tab audit cards match the
+    // capa-closure-monitor on load (it also opens unbounded). The old fixed
+    // 2026-08-31..2026-10-11 window went stale as exports extended past it.
+    dateFrom: D.meta.dateRange.from,
+    dateTo: D.meta.dateRange.to,
     cadenceGranularity: 'month', // 'day' | 'week' | 'month' — which trend the top-of-page toggle shows
     skuGroupBy: 'city',          // 'city' | 'store' | 'sku' — Expiry & SKU findings grouping
     latestOnly: true,            // true = collapse to the single latest audit per store (Pod Audits sheet toggle)

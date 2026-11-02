@@ -13,7 +13,7 @@ const OUT_JS = path.join(__dirname, '..', 'data', 'dashboard-data.js');
 // matching the folder + name prefix and drop exact-duplicate rows; the per-entity dedup
 // downstream (store+date for audits, auditId+questionNo for CAPA, keptAuditIds gate)
 // collapses overlapping history safely.
-function loadMergedCSV(dir, prefixes) {
+function loadMergedCSV(dir, prefixes, optional = false) {
   const full = path.join(ROOT, dir);
   const prefixList = Array.isArray(prefixes) ? prefixes : [prefixes];
   // Scan subfolders too (e.g. "backup 2026-10-08") — full-history files sometimes end up there.
@@ -39,6 +39,10 @@ function loadMergedCSV(dir, prefixes) {
     return da - db || (a < b ? -1 : 1);
   });
   if (!matches.length) {
+    if (optional) {
+      console.log(`  [optional] No CSV starting with ${JSON.stringify(prefixList)} found in "${dir}" — skipping.`);
+      return { idx: {}, rows: [], skippedDupeRows: 0 };
+    }
     throw new Error(`No CSV starting with ${JSON.stringify(prefixList)} found in "${dir}"`);
   }
   let headers = null;
@@ -75,7 +79,7 @@ const FILES = {
   responses: { dir: 'Audit Response', prefix: 'Pod Audit Tool - Audit Responses' },
   sku: { dir: 'Audit SKU wise', prefix: 'ARCHIVE AUDIT RESPONSES - Audit Sku Checks' },
   zoneVerify: { dir: 'Zone verify check - Copy', prefix: 'Pod Audit Tool - Audit Zone Verify Checks' },
-  expiryItems: { dir: 'expiry check items', prefix: 'Expiry Capture — Archive Data (cold history) - Expiry Check Items' },
+  expiryItems: { dir: 'expiry check items', prefix: 'Expiry Capture — Archive Data (cold history) - Expiry Check Items', optional: true },
   clusterDetails: { dir: 'Cluster details', prefix: 'Daily Review-redline - WTD' },
   // Deliberately not deep-processed:
   //  - "Audit Response wide" is the same data as `responses`, just pivoted wide (one row per
@@ -87,7 +91,7 @@ const FILES = {
 const FILE = FILES; // loadMerged(FILE.x) shorthand at call sites
 
 function loadMerged(def) {
-  return loadMergedCSV(def.dir, def.prefixes || def.prefix);
+  return loadMergedCSV(def.dir, def.prefixes || def.prefix, def.optional);
 }
 
 // ---------- CSV parsing (RFC4180-ish, handles quoted commas/newlines) ----------
@@ -393,6 +397,15 @@ function main() {
   if (synthesized) console.log(`  + ${synthesized} audits recovered from Audit Responses (${synthesizedRaw} raw missing rows -> deduped by store+day)`);
 
   audits.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  // Align the dashboard with the "Final report for submission - 31 Aug to 1 Nov" window:
+  // drop audits outside 31 Aug - 1 Nov 2026 so every number matches the report exactly.
+  const REPORT_FROM = '2026-08-31';
+  const REPORT_TO = '2026-11-01';
+  const beforeWindow = audits.length;
+  const windowFiltered = audits.filter((a) => a.date >= REPORT_FROM && a.date <= REPORT_TO);
+  audits.length = 0;
+  audits.push(...windowFiltered);
+  console.log(`  window filter ${REPORT_FROM}..${REPORT_TO}: ${beforeWindow} -> ${audits.length} audits`);
   const maxDate = audits.reduce((m, a) => (a.date > m ? a.date : m), audits[0] ? audits[0].date : '');
   const NOW = new Date(maxDate + 'T23:59:59Z');
   console.log(`  ${au.rows.length} raw rows -> ${audits.length} deduped audits, data as of ${maxDate}`);

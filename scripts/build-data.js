@@ -14,7 +14,7 @@ const OUT_JS = path.join(__dirname, '..', 'data', 'dashboard-data.js');
 // downstream (store+date for audits, auditId+questionNo for CAPA, keptAuditIds gate)
 // collapses overlapping history safely.
 function loadMergedCSV(dir, prefixes, optional = false) {
-  const full = path.join(ROOT, dir);
+  const full = path.isAbsolute(dir) ? dir : path.join(ROOT, dir);
   const prefixList = Array.isArray(prefixes) ? prefixes : [prefixes];
   // Scan subfolders too (e.g. "backup 2026-10-08") — full-history files sometimes end up there.
   const walk = (d) =>
@@ -81,6 +81,7 @@ const FILES = {
   zoneVerify: { dir: 'Zone verify check - Copy', prefix: 'Pod Audit Tool - Audit Zone Verify Checks' },
   expiryItems: { dir: 'expiry check items', prefix: 'Expiry Capture — Archive Data (cold history) - Expiry Check Items', optional: true },
   clusterDetails: { dir: 'Cluster details', prefix: 'Daily Review-redline - WTD' },
+  podMapping: { dir: path.join(ROOT, '..', 'CAPA Closure'), prefix: 'Pod Audit Tool - Pod Mapping Master' },
   // Deliberately not deep-processed:
   //  - "Audit Response wide" is the same data as `responses`, just pivoted wide (one row per
   //    audit, one column per checkpoint). We already get everything from the long format.
@@ -217,23 +218,22 @@ function normalizeCategory(rawBrand, rawCategory) {
 const CATEGORY_NAMES = ['FNV', 'Noice', 'DBEM', 'Other Brands'];
 
 // ---------- cluster mapping ----------
-// The "Cluster details" export keys on Pod ID (same format as Store Master's
-// Store_ID) and has a City column too. Store Master spells a few cities
-// differently than the Cluster file does — these are the only 3 mismatches
-// found by cross-checking every city name in both files.
-const CLUSTER_CITY_ALIASES = {
-  'Bhathinda': 'Bathinda',
-  'Bhubaneshwar': 'Bhubaneswar',
-  'Trivandrum': 'Thiruvananthapuram',
+// Aligned with the daily report (CAPA_Closure_Daily_Cluster_Wise_*): mapping comes
+// from "Pod Audit Tool - Pod Mapping Master" (Clustor column), normalized to the
+// same 7 clusters — AP & TS, East, KA & KL, North, Pune & Goa, TN, West.
+const CLUSTER_NORMALIZE = {
+  'AP & TS': 'AP & TS', 'East': 'East', 'KA & KL': 'KA & KL',
+  'North': 'North', 'Pune & Goa': 'Pune & Goa', 'TN': 'TN', 'West': 'West',
+  'NORTH': 'North', 'WEST': 'West', 'KA': 'KA & KL', 'KL': 'KA & KL',
 };
 function loadClusterMaps() {
-  const cd = loadMerged(FILE.clusterDetails);
+  const pm = loadMerged(FILE.podMapping);
   const clusterByPodId = new Map();
   const clusterByCity = new Map();
-  for (const r of cd.rows) {
-    const podId = get(r, cd.idx, 'Pod ID');
-    const city = get(r, cd.idx, 'City');
-    const cluster = get(r, cd.idx, 'Cluster');
+  for (const r of pm.rows) {
+    const podId = get(r, pm.idx, 'Pod ID');
+    const city = get(r, pm.idx, 'City');
+    const cluster = CLUSTER_NORMALIZE[(get(r, pm.idx, 'Clustor') || '').trim()];
     if (!cluster) continue;
     if (podId) clusterByPodId.set(podId, cluster);
     if (city && !clusterByCity.has(city)) clusterByCity.set(city, cluster);
@@ -242,8 +242,6 @@ function loadClusterMaps() {
     if (storeId && clusterByPodId.has(storeId)) return clusterByPodId.get(storeId);
     if (city) {
       if (clusterByCity.has(city)) return clusterByCity.get(city);
-      const alias = CLUSTER_CITY_ALIASES[city];
-      if (alias && clusterByCity.has(alias)) return clusterByCity.get(alias);
     }
     return 'Unmapped';
   }
@@ -397,10 +395,9 @@ function main() {
   if (synthesized) console.log(`  + ${synthesized} audits recovered from Audit Responses (${synthesizedRaw} raw missing rows -> deduped by store+day)`);
 
   audits.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  // Align the dashboard with the "Final report for submission - 31 Aug to 1 Nov" window:
-  // drop audits outside 31 Aug - 1 Nov 2026 so every number matches the report exactly.
+  // Align the dashboard with the daily report window: 31 Aug - 2 Nov 2026.
   const REPORT_FROM = '2026-08-31';
-  const REPORT_TO = '2026-11-01';
+  const REPORT_TO = '2026-11-02';
   const beforeWindow = audits.length;
   const windowFiltered = audits.filter((a) => a.date >= REPORT_FROM && a.date <= REPORT_TO);
   audits.length = 0;

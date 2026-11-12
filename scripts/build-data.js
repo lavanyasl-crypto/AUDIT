@@ -397,7 +397,7 @@ function main() {
   audits.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   // Align the dashboard with the daily report window: 31 Aug - 6 Nov 2026.
   const REPORT_FROM = '2026-08-31';
-  const REPORT_TO = '2026-11-09';
+  const REPORT_TO = '2026-11-12';
   const beforeWindow = audits.length;
   const windowFiltered = audits.filter((a) => a.date >= REPORT_FROM && a.date <= REPORT_TO);
   audits.length = 0;

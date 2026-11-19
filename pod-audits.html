@@ -485,23 +485,23 @@
         if (capaAuditIds[a.id]) { auditsWithCapa++; capaAuditIdsShared[a.id] = true; }
       }
     });
-    // audit-level status, over exactly the audits the shared card counts (findings + CAPA):
-    // an audit is "open" while ANY of its tasks is Open/In Progress, "closed" once all
-    // are Closed — so open + closed = audits with CAPA shared.
+    // audit-level status over exactly the audits the shared card counts (findings + CAPA):
+    // "closed" = at least ONE task Closed (closure started), "open" = no task Closed yet —
+    // so open + closed = audits with CAPA shared.
     var byAudit = {};
     f.capa.forEach(function(c){ if (capaAuditIdsShared[c.auditId]) (byAudit[c.auditId] = byAudit[c.auditId] || []).push(c); });
     var auditsOpen=0, auditsClosed=0;
     Object.keys(byAudit).forEach(function(id){
       var tasks = byAudit[id];
-      if (tasks.some(function(c){ return c.status === 'Open' || c.status === 'In Progress'; })) auditsOpen++;
-      else auditsClosed++;
+      if (tasks.some(function(c){ return c.status === 'Closed'; })) auditsClosed++;
+      else auditsOpen++;
     });
     var capaSharePct = auditsWithFindings ? Math.round(1000*auditsWithCapa/auditsWithFindings)/10 : 0;
     var auditClosedPct = (auditsOpen+auditsClosed) ? Math.round(100*auditsClosed/(auditsOpen+auditsClosed)) : 0;
     var cards = [
       { key:'cs-total', value:storeIds.length.toLocaleString(), label:'Stores with CAPA tasks' },
       { key:'cs-open', value:auditsOpen.toLocaleString(), label:'Audits — CAPA open' },
-      { key:'cs-closed', value:auditsClosed.toLocaleString(), label:'Audits — CAPA closed' },
+      { key:'cs-closed', value:auditsClosed.toLocaleString(), label:'Audits — CAPA closed (≥1 task)' },
       { key:'cs-closed-pct', value:auditClosedPct+'%', label:'Audits CAPA closed (%)' },
     ];
     el.innerHTML = cards.map(function(c){ return Charts.kpiCard({ key:c.key, value:c.value, label:c.label }); }).join('');

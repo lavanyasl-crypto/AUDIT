@@ -798,10 +798,16 @@
         if (audit){
           var catLbl = cat === 'exec' ? 'All categories' : cat;
           var zColor = zoneOf(audit.scorePercent) === 'g' ? 'var(--good)' : zoneOf(audit.scorePercent) === 'y' ? 'var(--zone-yellow)' : 'var(--bad)';
+          var compliant = 0;
+          (D.categoryStats.responses || []).forEach(function(t){
+            if (t[0] === audit.id && t[2] === 'Compliance') compliant++;
+          });
           var body = '<div class="section-sub" style="margin-bottom:14px">'+esc(audit.city)+' · '+esc(audit.storeName)+' (ID '+esc(audit.storeId)+') · Latest audit '+esc(audit.date)+'</div>'+
             '<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px">'+
               '<div><div style="font-size:12px;color:var(--text-soft);font-weight:600;margin-bottom:2px">Audit score</div>'+
                 '<div style="font-size:26px;font-weight:700;color:'+zColor+'">'+audit.scorePercent+'%</div></div>'+
+              '<div><div style="font-size:12px;color:var(--text-soft);font-weight:600;margin-bottom:2px">Compliant</div>'+
+                '<div style="font-size:26px;font-weight:700;color:var(--good)">'+compliant+'</div></div>'+
               '<div><div style="font-size:12px;color:var(--text-soft);font-weight:600;margin-bottom:2px">Non-compliances</div>'+
                 '<div style="font-size:26px;font-weight:700">'+audit.nc+'</div></div>'+
               '<div><div style="font-size:12px;color:var(--text-soft);font-weight:600;margin-bottom:2px">Partial</div>'+

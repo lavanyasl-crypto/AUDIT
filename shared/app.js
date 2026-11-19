@@ -685,14 +685,28 @@
   ];
   function zoneOf(pct){ return pct >= 80 ? 'g' : pct >= 60 ? 'y' : 'r'; }
 
-  // Mean of the per-store category scores from zonePodScores — the KPI card's
-  // "Average audit score" (overall for exec, per category on FNV/Noice/DBEM tabs).
+  // Mean audit score for the KPI card — respects the All audits / Latest audit
+  // toggle: in "All audits" mode every audit in range is averaged; in "Latest
+  // audit" mode one audit per store (via computeFiltered). Category tabs
+  // (FNV/Noice/DBEM) average only audits that have response rows in that
+  // category; the score averaged is still the audit's overall scorePercent.
   function avgCategoryScore(cat){
-    var pods = zonePodScores(cat || 'exec');
-    if (!pods.length) return null;
+    cat = cat || 'exec';
+    var audits = computeFiltered().audits;
+    if (cat !== 'exec'){
+      var catParams = {};
+      (D.categoryCompliance[cat] || []).forEach(function(p){ catParams[p.key] = true; });
+      var ids = {};
+      (D.categoryStats.responses || []).forEach(function(t){
+        if (t[1] === 'Remarks') return;
+        if (catParams[t[1]] && t[3] === cat) ids[t[0]] = true;
+      });
+      audits = audits.filter(function(a){ return ids[a.id]; });
+    }
+    if (!audits.length) return null;
     var sum = 0;
-    pods.forEach(function(p){ sum += p.score; });
-    return Math.round(10*sum/pods.length)/10;
+    audits.forEach(function(a){ sum += (a.scorePercent || 0); });
+    return Math.round(10*sum/audits.length)/10;
   }
 
   // Latest audit per store within the current filters. Score = the audit's own
